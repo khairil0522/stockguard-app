@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from app.api.v1.root import router as root_router
 from app.api.v1.products import router as products_router
 from app.api.v1.stock_adjustments import router as stock_adjustments_router
 from app.api.v1.booking import router as booking_router
@@ -15,6 +16,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(root_router)
 app.include_router(products_router, prefix="/api/v1")
 app.include_router(stock_adjustments_router, prefix="/api/v1")
 app.include_router(booking_router, prefix="/api/v1")
