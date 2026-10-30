@@ -1,11 +1,14 @@
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+import apiClient from "./apiClients";
 
 export async function fetchProducts() {
-    const response = await fetch(`${API_BASE_URL}/products`);
+    const response = await apiClient.get("/products");
+    return response.data;
+}
 
-    if (!response.ok) {
-        throw new Error("Gagal mengambil daftar produk");
-    }
+export async function createProduct(productData) {
+    const response = await apiClient.post(
+        "/products", productData
+    );
 
-    return response.json();
+    return response.data;
 }

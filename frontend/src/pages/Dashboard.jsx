@@ -1,6 +1,6 @@
     import { useState, useEffect } from "react";
     import MetricCard from "../components/MetricCard";
-    import getMovementColor from "../utils/Movementcolor"
+    import getMovementColor from "../utils/movementUtils"
 
     export default function Dashboard() {
 
