@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { fetchProducts, createProduct } from "../services/productService";
 import getActiveStatusColor from "../utils/productUtils";
 
-export default function Products() {
+export default function Products({ onViewDetail }) {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -215,6 +215,7 @@ export default function Products() {
                             <th className="px-6 py-4">Product Name</th>
                             <th className="px-6 py-4">Unit Price</th>
                             <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Action</th>
                         </tr>
                     </thead>
 
@@ -246,12 +247,20 @@ export default function Products() {
                                         {product.is_active ? "Active" : "Inactive"}
                                     </span>
                                 </td>
+                                <td className="px-6 py-4">
+                                    <button
+                                        onClick={() => onViewDetail(product)}
+                                        className="rounded-lg bg-slate-800 px-3 py-2 text-sm text-white hover:bg-slate-700"
+                                    >
+                                        View Detail
+                                    </button>
+                                </td>
                             </tr>
                         ))}
 
                         {products.length === 0 && (
                             <tr>
-                                <td colSpan={4} className="px-6 py-10 text-center text-slate-500">
+                                <td colSpan={5} className="px-6 py-10 text-center text-slate-500">
                                     Belum ada produk.
                                 </td>
                             </tr>
