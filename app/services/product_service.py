@@ -1,10 +1,10 @@
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.models import Inventory, Product
-from app.schemas.product import ProductCreate
-from app.errors.product import DuplicateSKUError
+from app.schemas.product import ProductCreate, ProductUpdate
+from app.errors.product import DuplicateSKUError, ProductNotFoundError
 
 def create_product_with_inventory(
     db: Session,
@@ -54,3 +54,77 @@ def create_product_with_inventory(
             raise DuplicateSKUError(payload.sku) from exc
 
         raise
+
+def get_all_products(db: Session):
+    statement = select(Product).order_by(Product.name).where(Product.is_active==True)
+    products = db.scalars(statement).all()
+
+    return products
+
+def get_all_products_deleted(db: Session):
+    statement = select(Product).order_by(Product.name).where(Product.is_active==False)
+    products = db.scalars(statement).all()
+
+    return products
+
+def get_detail_product(db: Session, product_id : UUID):
+    statement = (
+        select(Product)
+        .options(selectinload(Product.inventory))
+        .where(Product.id == product_id)
+    )   
+    product = db.scalar(statement)
+    if product is None:
+        raise ProductNotFoundError()
+    
+    return product
+
+def update_product_without_inventory(
+    db: Session,
+    product_id : UUID,
+    payload : ProductUpdate
+):
+    product = db.get(Product, product_id)
+
+    if product is None:
+        raise ProductNotFoundError()
+    
+    update_data = payload.model_dump(exclude_unset=True)
+
+    for field, value in update_data.items():
+        setattr(product, field, value)
+
+    db.commit()
+    db.refresh(product)
+
+    return product
+
+def remove_product(
+    db: Session,
+    product_id: UUID
+):
+    product = db.get(Product, product_id)
+
+    if product is None:
+        raise ProductNotFoundError()
+    
+    product.is_active = False
+    db.commit()
+    db.refresh(product)
+
+    return product
+
+def restore_product(
+    db: Session,
+    product_id: UUID
+):
+    product = db.get(Product, product_id)
+
+    if product is None:
+        raise ProductNotFoundError()
+    
+    product.is_active = True
+    db.commit()
+    db.refresh(product)
+
+    return product

@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
+from app.schemas.inventory import InventoryRead
 from uuid import UUID
 
 class ProductCreate(BaseModel):
@@ -16,3 +17,12 @@ class ProductRead(BaseModel):
     description: str | None
     unit_price : int
     is_active: bool
+
+class ProductDetailRead(ProductRead):
+    inventory: InventoryRead | None = None
+
+class ProductUpdate(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    unit_price: int | None = Field(default=None, ge=0)
+    is_active: bool | None = None
