@@ -1,5 +1,6 @@
 from typing import Literal
 from uuid import UUID
+from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,5 +32,16 @@ class StockAdjustmentHistoryRead(BaseModel):
     quantity: int
     previous_on_hand: int
     new_on_hand: int
+    reason: str
+    product_name: str
+
+class StockMovementHistoryByProduct(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    product_id: UUID
+    created_at: datetime
+    movement_type: Literal["INCREASE", "DECREASE"]
+    quantity: int
     reason: str
     product_name: str

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchProducts, createProduct } from "../services/productService";
+import { fetchProducts, createProduct, fetchProductDetail } from "../services/productService";
 import getActiveStatusColor from "../utils/productUtils";
 
 export default function Products({ onViewDetail }) {

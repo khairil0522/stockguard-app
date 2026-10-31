@@ -1,42 +1,22 @@
-const mockInventory = {
-    on_hand: 100,
-    reserved_qty: 20,
-    available_qty: 80,
-};
-
-const mockMovements = [
-    {
-        id: 1,
-        date: "2026-10-30",
-        type: "INCREASE",
-        quantity: 50,
-        reason: "Stock replenishment",
-    },
-    {
-        id: 2,
-        date: "2026-10-29",
-        type: "DECREASE",
-        quantity: 10,
-        reason: "Stock adjustment",
-    },
-    {
-        id: 3,
-        date: "2026-10-28",
-        type: "INCREASE",
-        quantity: 60,
-        reason: "Initial stock",
-    },
-];
+import InventoryCard from "../components/InventoryCard"
+import { formatCurrency } from "../utils/formatCurrency";
+import { useEffect } from "react";
+import { useStockMovement } from "../hooks/useMovements";
 
 export default function ProductDetail({ product, onBack }) {
-    const formatCurrency = (value) =>
-        Number(value).toLocaleString("id-ID", {
-            style: "currency",
-            currency: "IDR",
-            maximumFractionDigits: 0,
-        });
+
+    const { stockMovements, handleFetchStockMovement } = useStockMovement();
+
+    useEffect(() => {
+        if (product?.id) {
+            handleFetchStockMovement(product.id);
+        }
+    }, [product?.id]);
+
+    console.log("Stock Movements:", stockMovements);
 
     return (
+        <>
         <div className="p-8 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -67,6 +47,9 @@ export default function ProductDetail({ product, onBack }) {
 
             {/* Product Information */}
             <div className="rounded-xl border border-slate-200 bg-white p-6">
+                <h2 className="text-lg font-semibold text-slate-800">
+                    Product Information
+                </h2>
                 <p className="mb-2 text-sm text-slate-500">
                     SKU: {product.sku}
                 </p>
@@ -75,12 +58,16 @@ export default function ProductDetail({ product, onBack }) {
                     {product.name}
                 </h2>
 
-                <p className="mt-3 text-slate-500">
+                <p className="mt-2 text-sm text-slate-500">
                     {product.description || "No description available."}
                 </p>
 
                 <p className="mt-5 text-xl font-semibold text-slate-800">
-                    {formatCurrency(product.unit_price)}
+                    {formatCurrency(product.unit_price, "IDR")}
+                </p>
+
+                <p className="text-sm text-slate-500">
+                    Last Updated: {product.updated_at || "No update yet"}
                 </p>
             </div>
 
@@ -93,18 +80,22 @@ export default function ProductDetail({ product, onBack }) {
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <InventoryCard
                         title="On Hand"
-                        value={mockInventory.on_hand}
+                        value={product.inventory.on_hand}
+                        color="blue"
                     />
 
                     <InventoryCard
                         title="Reserved"
-                        value={mockInventory.reserved_qty}
+                        value={product.inventory.reserved_qty}
+                        color="amber"
                     />
 
                     <InventoryCard
                         title="Available"
-                        value={mockInventory.available_qty}
+                        value={product.inventory.available_qty}
+                        color="emerald"
                     />
+                    
                 </div>
             </div>
 
@@ -126,44 +117,43 @@ export default function ProductDetail({ product, onBack }) {
                         </thead>
 
                         <tbody className="divide-y divide-slate-100">
-                            {mockMovements.map((movement) => (
+
+                            {stockMovements.length === 0 ? (
+                            <tr>
+                                <td colSpan="4" className="px-4 py-6 text-center text-slate-400">
+                                No stock movement history available.
+                                </td>
+                            </tr>
+                            ) : (
+                            stockMovements.map((movement) => (
                                 <tr key={movement.id}>
                                     <td className="px-4 py-3">
-                                        {movement.date}
+                                        {new Date(movement.created_at).toLocaleString("id-ID")}
                                     </td>
                                     <td className="px-4 py-3">
                                         <span className={
-                                            movement.type === "INCREASE"
+                                            movement.movement_type === "INCREASE"
                                                 ? "font-medium text-emerald-600"
                                                 : "font-medium text-red-600"
                                         }>
-                                            {movement.type}
+                                            {movement.movement_type}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3">
-                                        {movement.type === "INCREASE" ? "+" : "-"}
+                                        {movement.movement_type === "INCREASE" ? "+" : "-"}
                                         {movement.quantity}
                                     </td>
                                     <td className="px-4 py-3">
                                         {movement.reason}
                                     </td>
                                 </tr>
-                            ))}
+                            ))
+                            )}
                         </tbody>
                     </table>
                 </div>
             </div>
         </div>
-    );
-}
-
-function InventoryCard({ title, value }) {
-    return (
-        <div className="rounded-xl border border-slate-200 bg-white p-6">
-            <p className="text-sm text-slate-500">{title}</p>
-            <h3 className="mt-2 text-3xl font-bold text-slate-800">
-                {value}
-            </h3>
-        </div>
+        </>
     );
 }

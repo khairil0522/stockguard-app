@@ -5,6 +5,11 @@ export async function fetchProducts() {
     return response.data;
 }
 
+export async function fetchProductDetail(productId) {
+    const response = await apiClient.get(`/products/${productId}`);
+    return response.data;
+}
+
 export async function createProduct(productData) {
     const response = await apiClient.post(
         "/products", productData

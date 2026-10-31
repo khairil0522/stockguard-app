@@ -73,3 +73,31 @@ def get_stock_adjustment(db: Session):
         }
         for movement, product_name in get_stocks
 ]
+
+def get_stock_adjustment_by_product(db: Session, product_id: UUID):
+    get_stock = (
+        db.query(
+            StockMovement,
+            Product.name.label("product_name")
+        )
+        .join(Product, Product.id == StockMovement.product_id)
+        .where(StockMovement.product_id == product_id)
+        .order_by(StockMovement.created_at.desc())
+        .all()
+    )
+
+    if not get_stock:
+        raise(StockNotFoundError())
+
+    return [
+        {
+            "id": movement.id,
+            "product_id": movement.product_id,
+            "created_at": movement.created_at,
+            "movement_type": movement.movement_type,
+            "quantity": movement.quantity,
+            "reason": movement.reason,
+            "product_name": product_name,
+        }
+        for movement, product_name in get_stock
+]

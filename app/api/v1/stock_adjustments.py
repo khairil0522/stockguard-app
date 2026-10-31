@@ -7,10 +7,11 @@ from app.db.session import get_db
 from app.schemas.stock_movement import (
     StockAdjustmentCreate,
     StockAdjustmentRead,
-    StockAdjustmentHistoryRead
+    StockAdjustmentHistoryRead,
+    StockMovementHistoryByProduct
 )
 from app.services.stock_adjustment_service import (
-    adjust_stock, get_stock_adjustment
+    adjust_stock, get_stock_adjustment, get_stock_adjustment_by_product
 )
 
 from app.errors.product import ProductNotFoundError
@@ -70,6 +71,23 @@ def get_stocks(
         stock_list = get_stock_adjustment(db)
         return stock_list
 
+    except StockNotFoundError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail
+        )
+
+@router.get(
+    "/{product_id}",
+    response_model=list[StockMovementHistoryByProduct],
+    status_code=status.HTTP_200_OK)
+def get_stocks_by_product_id(
+    product_id: UUID,
+    db: Session = Depends(get_db),
+):
+    try:
+        stock_list = get_stock_adjustment_by_product(db, product_id)
+        return stock_list
     except StockNotFoundError as exc:
         raise HTTPException(
             status_code=exc.status_code,

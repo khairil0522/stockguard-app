@@ -46,6 +46,10 @@ Its main objective is to ensure that stock quantities remain consistent while su
 - [x] Product listing
 - [x] Product creation
 - [x] Latest stock movement overview
+- [x] Product detail
+- [x] Product information
+- [x] Inventory overview
+- [x] Product-specific stock movement history
 
 ---
 
@@ -172,6 +176,13 @@ Stock adjustments support two movement types:
 | `INCREASE` | Add stock quantity |
 | `DECREASE` | Reduce stock quantity |
 
+### Stock Movement
+
+| Method | Endpoint | Description |
+|---|---|---|
+| GET | `/stocks` | Retrieve latest stock movements |
+| GET | `/stocks/{product_id}` | Retrieve stock movements by product |
+
 Stock adjustments are validated against available inventory to prevent invalid stock operations.
 
 ---
@@ -274,7 +285,7 @@ http://localhost:5173
 - [x] Stock movement tracking
 - [x] Dashboard
 - [x] Product management frontend
-- [ ] Product detail frontend
+- [x] Product detail frontend
 - [ ] Product update and deactivation frontend
 - [ ] Stock adjustment frontend
 - [ ] Stock reservation workflow
