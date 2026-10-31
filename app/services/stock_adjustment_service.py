@@ -87,7 +87,7 @@ def get_stock_adjustment_by_product(db: Session, product_id: UUID):
     )
 
     if not get_stock:
-        raise(StockNotFoundError())
+        raise StockNotFoundError()
 
     return [
         {

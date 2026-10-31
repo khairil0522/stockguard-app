@@ -13,8 +13,6 @@ export default function ProductDetail({ product, onBack }) {
         }
     }, [product?.id]);
 
-    console.log("Stock Movements:", stockMovements);
-
     return (
         <>
         <div className="p-8 space-y-6">
