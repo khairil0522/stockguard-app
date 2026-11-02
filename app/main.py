@@ -4,6 +4,7 @@ from app.api.v1.products import router as products_router
 from app.api.v1.stock_adjustments import router as stock_adjustments_router
 from app.api.v1.booking import router as booking_router
 from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.inventory import router as inventory_router
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="StockGuard API")
@@ -21,3 +22,4 @@ app.include_router(products_router, prefix="/api/v1")
 app.include_router(stock_adjustments_router, prefix="/api/v1")
 app.include_router(booking_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(inventory_router, prefix="/api/v1")

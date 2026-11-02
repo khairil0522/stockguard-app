@@ -3,6 +3,7 @@ export default function Sidebar({ activePage, onNavigate }) {
   const menuItems = [
     "Dashboard",
     "Products",
+    "Inventory",
     "Stock Adjustments",
     "Bookings",
   ];

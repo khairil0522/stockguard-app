@@ -6,5 +6,5 @@ class AppError(Exception):
     error_code = "INTERNAL_SERVER_ERROR"
 
     def __init__(self, message: str | None = None):
-        self.message = message or type(self).message
-        super().__init__(self.message)
+        self.detail = message or type(self).detail
+        super().__init__(self.detail)
