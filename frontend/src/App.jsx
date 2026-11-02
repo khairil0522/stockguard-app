@@ -9,10 +9,10 @@ import { useProduct } from "./hooks/useProducts";
 
 function App() {
   const [activePage, setActivePage] = useState("Dashboard");
-  const { selectedProduct, handleViewDetail } = useProduct();
+  const { selectedProduct, handleProductDetail, handleUpdateProduct } = useProduct();
 
   const handleNavigateToDetail = async (product) => {
-      const detail = await handleViewDetail(product);
+      const detail = await handleProductDetail(product);
 
       if (detail) {
           setActivePage("ProductDetail");

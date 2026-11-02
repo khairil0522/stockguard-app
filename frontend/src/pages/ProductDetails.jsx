@@ -11,7 +11,7 @@ export default function ProductDetail({ product, onBack }) {
         if (product?.id) {
             handleFetchStockMovement(product.id);
         }
-    }, [product?.id]);
+    }, [product?.id]);  
 
     return (
         <>

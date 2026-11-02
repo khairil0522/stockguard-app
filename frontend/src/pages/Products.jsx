@@ -1,17 +1,44 @@
+// ==========================================
+// IMPORTS
+// Dependencies, services, and utilities
+// ==========================================
 import { useEffect, useState } from "react";
-import { fetchProducts, createProduct, fetchProductDetail } from "../services/productService";
+import { fetchProducts, createProduct, updateProduct, deleteProduct } from "../services/productService";
+
 import getActiveStatusColor from "../utils/productUtils";
 
+// ==========================================
+// PRODUCT LIST COMPONENT
+// Main page for managing products
+// ==========================================   
 export default function Products({ onViewDetail }) {
+    // ----------------------------------------
+    // STATE MANAGEMENT
+    // Stores product data and UI states
+    // ----------------------------------------
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    //submit
+
+    // ----------------------------------------
+    // CREATE PRODUCT FORM STATE
+    // Controls form visibility and submission
+    // ----------------------------------------
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState("");
     const [formError, setFormError] = useState("");
 
+    // ==========================================
+    // SELECTED PRODUCT STATE
+    // Stores product currently being edited
+    // ==========================================
+    const [editingProduct, setEditingProduct] = useState(null);
+
+    // ----------------------------------------
+    // PRODUCT FORM DATA
+    // Stores values entered by the user
+    // ----------------------------------------
     const [form, setForm] = useState({
         sku: "",
         name: "",
@@ -19,6 +46,10 @@ export default function Products({ onViewDetail }) {
         description: "",
     });
 
+    // ----------------------------------------
+    // FETCH PRODUCT LIST
+    // Retrieves products from backend API
+    // ----------------------------------------
     async function loadProducts() {
         setLoading(true);
         setError("");
@@ -33,6 +64,10 @@ export default function Products({ onViewDetail }) {
         }
     }
 
+    // ----------------------------------------
+    // INITIAL DATA LOADING
+    // Fetches products when component mounts
+    // ----------------------------------------
     useEffect(() => {
         loadProducts();
     }, []);
@@ -50,6 +85,10 @@ export default function Products({ onViewDetail }) {
         );
     }
 
+    // ----------------------------------------
+    // CREATE/UPDATE PRODUCT HANDLER
+    // Handles product creation/update and API response based on conditions
+    // ----------------------------------------
     async function handleSubmit(event) {
         event.preventDefault();
 
@@ -58,14 +97,21 @@ export default function Products({ onViewDetail }) {
         setFormError("");
 
         try {
-            await createProduct({
-                sku: form.sku.trim(),
+            const productData = {
                 name: form.name.trim(),
                 unit_price: Number(form.unit_price),
                 description: form.description.trim(),
-            });
+            }
 
-            setSuccess("Produk berhasil dibuat!");
+            if (editingProduct) {
+                await updateProduct(editingProduct.id, productData);
+                setSuccess("Produk berhasil diperbarui!");
+            } else {
+                productData.sku = form.sku.trim();
+                await createProduct(productData);
+                setSuccess("Produk berhasil dibuat!");
+            }
+
             setForm({
                 sku: "",
                 name: "",
@@ -74,6 +120,7 @@ export default function Products({ onViewDetail }) {
             });
 
             setShowForm(false);
+            setEditingProduct(null);
             await loadProducts();
         } catch (err) {
             setFormError(err.message);
@@ -82,6 +129,48 @@ export default function Products({ onViewDetail }) {
         }
     }
 
+    function handleEditProduct(product) {
+        setEditingProduct(product);
+
+        setForm({
+            sku: product.sku,
+            name: product.name,
+            unit_price: product.unit_price.toString(),
+            description: product.description || "",
+        });
+
+        setShowForm(true);
+        setFormError("");
+        setSuccess("");
+    }
+
+    // Menonaktifkan produk tanpa menghapus data dari database
+    async function handleDeactivateProduct(product) {
+        const confirmed = window.confirm(
+            `Apakah kamu yakin ingin menonaktifkan produk ${product.name}?`
+        );
+
+        // Batalkan proses jika pengguna memilih Cancel
+        if (!confirmed) return;
+
+        setSuccess("");
+        setFormError("");
+
+        try {
+            await deleteProduct(product.id);
+
+            setSuccess("Produk berhasil dinonaktifkan!");
+
+            // Ambil ulang daftar produk setelah proses berhasil
+            await loadProducts();
+        } catch (err) {
+            setFormError(err.message);
+        }
+    }
+
+    // ==========================================
+    // RENDER UI
+    // ==========================================
     return (
         <div className="p-8">
             <div className="mb-6 flex items-center justify-between">
@@ -107,9 +196,16 @@ export default function Products({ onViewDetail }) {
             <div className="mb-6 flex justify-end">
                 <button
                     onClick={() => {
+                        setForm({
+                            sku: "",
+                            name: "",
+                            unit_price: "",
+                            description: "",
+                        });
                         setShowForm(!showForm);
                         setFormError("");
                         setSuccess("");
+                        setEditingProduct(null);
                     }}
                     className="rounded-lg bg-emerald-500 px-4 py-2 font-medium text-slate-950 hover:bg-emerald-400"
                 >
@@ -142,8 +238,13 @@ export default function Products({ onViewDetail }) {
                             onChange={(e) =>
                                 setForm({ ...form, sku: e.target.value })
                             }
-                            className="w-full rounded-lg border border-slate-300 px-3 py-2"
+                            className={`w-full rounded-lg border px-3 py-2 outline-none ${
+                                editingProduct
+                                    ? "cursor-not-allowed border-gray-300 bg-gray-100 text-gray-500"
+                                    : "border-gray-300 bg-white text-gray-900 focus:border-blue-500"
+                            }`}
                             placeholder="ELE-LAP-004"
+                            disabled={!!editingProduct}
                         />
                     </div>
 
@@ -201,7 +302,7 @@ export default function Products({ onViewDetail }) {
                         disabled={saving}
                         className="rounded-lg bg-emerald-500 px-5 py-2 font-medium text-slate-950 hover:bg-emerald-400 disabled:opacity-50"
                     >
-                        {saving ? "Saving..." : "Save Product"}
+                        {saving ? "Saving...": editingProduct ? "Update Product" : "Save Product"}
                     </button>
                 </form>
             )}
@@ -211,11 +312,11 @@ export default function Products({ onViewDetail }) {
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500">
                         <tr>
-                            <th className="px-6 py-4">SKU</th>
-                            <th className="px-6 py-4">Product Name</th>
-                            <th className="px-6 py-4">Unit Price</th>
-                            <th className="px-6 py-4">Status</th>
-                            <th className="px-6 py-4">Action</th>
+                            <th className="px-6 py-4" >SKU</th> 
+                            <th className="px-6 py-4" >Product Name</th>
+                            <th className="px-6 py-4" >Unit Price</th>
+                            <th className="px-6 py-4" >Status</th>
+                            <th className="px-6 py-4 text-center" >Action</th>
                         </tr>
                     </thead>
 
@@ -247,13 +348,27 @@ export default function Products({ onViewDetail }) {
                                         {product.is_active ? "Active" : "Inactive"}
                                     </span>
                                 </td>
-                                <td className="px-6 py-4">
-                                    <button
-                                        onClick={() => onViewDetail(product)}
-                                        className="rounded-lg bg-slate-800 px-3 py-2 text-sm text-white hover:bg-slate-700"
-                                    >
-                                        View Detail
-                                    </button>
+                                <td className="px-6 py-4    ">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => onViewDetail(product)}
+                                            className="rounded-lg bg-slate-800 px-3 py-2 text-sm text-white hover:bg-slate-700"
+                                        >
+                                            Detail
+                                        </button>
+                                        <button
+                                            onClick={() => handleEditProduct(product)}
+                                            className="rounded-lg bg-amber-500 px-3 py-2 text-sm text-white hover:bg-amber-600"
+                                        >
+                                            Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleDeactivateProduct(product)}
+                                            className="rounded-lg bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600"
+                                        >
+                                            Deactivate
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}

@@ -1,18 +1,27 @@
 import { useState } from "react";
-import { fetchProductDetail } from "../services/productService";
+import { fetchProductDetail, updateProduct } from "../services/productService";
 
 export function useProduct() {
     const [selectedProduct, setSelectedProduct] = useState(null);
 
-    const handleViewDetail = async (product) => {
+    const handleProductDetail = async (product) => {
         const detail = await fetchProductDetail(product.id);
         setSelectedProduct(detail);
 
         return detail;
     };
 
+    const handleUpdateProduct = async (productId, productData) => {
+        const updatedProduct = await updateProduct(productId, productData);
+
+        setSelectedProduct(updatedProduct);
+
+        return updatedProduct;
+    };
+
     return {
         selectedProduct,
-        handleViewDetail,
+        handleProductDetail,
+        handleUpdateProduct,
     };
 }
