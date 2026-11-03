@@ -1,6 +1,6 @@
     import { useState, useEffect } from "react";
     import MetricCard from "../components/MetricCard";
-    import getMovementColor from "../utils/movementUtils"
+    import { getMovementColor, getMovementIcon } from "../utils/movementUtils"
 
     export default function Dashboard() {
 
@@ -109,14 +109,22 @@
                     </td>
 
                     <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                            {getMovementIcon(movement.movement_type)}
                         <span
                             className={`rounded-full px-3 py-1 text-xs font-semibold ${getMovementColor(movement.movement_type)}`}
                         >
                             {movement.movement_type}
                         </span>
+                        </div>
                     </td>
 
-                    <td className="px-6 py-4 text-slate-600">
+                    <td className={`px-6 py-4 font-semibold ${
+                        movement.movement_type === "INCREASE"
+                            ? "text-emerald-600"
+                            : "text-red-600"
+                    }`}>
+                        {movement.movement_type === "INCREASE" ? "+" : "-"}
                         {movement.quantity}
                     </td>
 
