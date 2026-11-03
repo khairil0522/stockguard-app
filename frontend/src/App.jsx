@@ -7,6 +7,7 @@ import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetails";
 import Inventory from "./pages/Inventory";
 import InventoryDetails from "./pages/InventoryDetails";
+import StockAdjustments from "./pages/StockAdjustments";
 import { useProduct } from "./hooks/useProducts";
 import { useInventory } from "./hooks/useInventory";
 
@@ -63,6 +64,8 @@ function App() {
                 onBack={() => setActivePage("Inventory")}
             />
         )}
+
+        {activePage === "StockAdjustments" && <StockAdjustments />}
       </main>
     </div>
   );

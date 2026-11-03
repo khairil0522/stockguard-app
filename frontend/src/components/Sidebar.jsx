@@ -1,11 +1,11 @@
 
 export default function Sidebar({ activePage, onNavigate }) {
   const menuItems = [
-    "Dashboard",
-    "Products",
-    "Inventory",
-    "Stock Adjustments",
-    "Bookings",
+      { label: "Dashboard", value: "Dashboard" },
+      { label: "Products", value: "Products" },
+      { label: "Inventory", value: "Inventory" },
+      { label: "Stock Adjustments", value: "StockAdjustments" },
+      { label: "Bookings", value: "Bookings" },
   ];
 
   return (
@@ -21,17 +21,17 @@ export default function Sidebar({ activePage, onNavigate }) {
 
       <nav className="mt-8 flex flex-col gap-2">
         {menuItems.map((item) => (
-          <button
-            key={item}
-            onClick={() => onNavigate(item)}
-            className={`rounded-lg px-4 py-3 text-left transition-colors ${
-              activePage === item
-                ? "bg-indigo-600 text-white"
-                : "text-slate-300 hover:bg-slate-800 hover:text-white"
-            }`}
-          >
-            {item}
-          </button>
+            <button
+                key={item.value}
+                onClick={() => onNavigate(item.value)}
+                className={`rounded-lg px-4 py-3 text-left transition-colors ${
+                    activePage === item.value
+                        ? "bg-indigo-600 text-white"
+                        : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                }`}
+            >
+                {item.label}
+            </button>
         ))}
       </nav>
     </aside>
