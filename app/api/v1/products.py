@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.product import ProductCreate, ProductRead, ProductDetailRead, ProductUpdate
-from app.services.product_service import create_product_with_inventory, get_detail_product, get_all_products, update_product_without_inventory, remove_product
+from app.schemas.product import ProductCreate, ProductRead, ProductDetailRead, ProductUpdate, ProductStatusUpdate, ProductResponse
+from app.services.product_service import create_product_with_inventory, get_detail_product, get_all_products, update_product_without_inventory, restatus_product
 from app.errors.product import DuplicateSKUError, ProductNotFoundError
 from app.models.products import Product
 
@@ -74,17 +74,18 @@ def update_product(
             detail = exc.detail
         )
 
-@router.delete(
-    "/{product_id}",
-    response_model=ProductRead,
+@router.patch(
+    "/{product_id}/status",
+    response_model=ProductResponse,
     status_code=status.HTTP_200_OK,
 )
-def delete_product(
+def update_product_status(
     product_id : UUID,
+    payload: ProductStatusUpdate,
     db: Session = Depends(get_db)
 ):
     try:
-        return remove_product(db, product_id)
+        return restatus_product(db, product_id, payload.is_active)
     except ProductNotFoundError as exc :
         raise HTTPException(
             status_code=exc.status_code,

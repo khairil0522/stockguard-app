@@ -28,8 +28,10 @@ export async function updateProduct(productId, productData) {
     return response.data;
 }
 
-// Delete a specific product (this is soft delete, marking it as inactive)
-export async function deleteProduct(productId) {
-    const response = await apiClient.delete(`/products/${productId}`);
+// Update product status (active/inactive)
+export async function updateProductStatus(productId, isActive) {
+    const response = await apiClient.patch(
+        `/products/${productId}/status`, { is_active: isActive }
+    );
     return response.data;
 }

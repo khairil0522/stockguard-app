@@ -26,3 +26,14 @@ class ProductUpdate(BaseModel):
     description: str | None = None
     unit_price: int | None = Field(default=None, ge=0)
     is_active: bool | None = None
+
+class ProductStatusUpdate(BaseModel):
+    is_active: bool
+
+class ProductResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    sku: str
+    name: str
+    is_active: bool

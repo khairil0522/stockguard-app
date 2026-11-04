@@ -66,7 +66,8 @@ export default function Inventory({ onViewDetail }) {
                             <th className="px-6 py-4" >SKU</th> 
                             <th className="px-6 py-4" >Product Name</th>
                             <th className="px-6 py-4" >On Hand</th>
-                            <th className="px-6 py-4" >Available</th>
+                            <th className="px-6 py-4" >Available    </th>
+                            <th className="px-6 py-4" >Product Status</th>
                             <th className="px-6 py-4 text-center" >Action</th>
                         </tr>
                     </thead>
@@ -85,6 +86,17 @@ export default function Inventory({ onViewDetail }) {
                                 </td>
                                 <td className={`px-6 py-4 ${inventoryItem.available_qty === 0 ? 'text-red-500' : 'text-green-500'}`}>
                                     {inventoryItem.available_qty === 0 ? 'Fully Reserved' : inventoryItem.available_qty}
+                                </td>
+                                <td className="px-6 py-4">
+                                    <span
+                                        className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                                            inventoryItem.is_active
+                                                ? "bg-emerald-100 text-emerald-700"
+                                                : "bg-red-100 text-red-700"
+                                        }`}
+                                    >
+                                        {inventoryItem.is_active ? "Active" : "Inactive"}
+                                    </span>
                                 </td>
                                 <td className="px-6 py-4 text-center">
                                     <button

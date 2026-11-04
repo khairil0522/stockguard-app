@@ -3,8 +3,8 @@
 // Dependencies, services, and utilities
 // ==========================================
 import { useEffect, useState } from "react";
-import { fetchProducts, createProduct, updateProduct, deleteProduct } from "../services/productService";
-
+import { fetchProducts, createProduct, updateProduct, updateProductStatus } from "../services/productService";
+import DialogBox from "../components/DialogBox";
 import getActiveStatusColor from "../utils/productUtils";
 
 // ==========================================
@@ -17,8 +17,20 @@ export default function Products({ onViewDetail }) {
     // Stores product data and UI states
     // ----------------------------------------
     const [products, setProducts] = useState([]);
+
+    // Controls the selected product status tab
+    const [activeTab, setActiveTab] = useState("active");
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+
+    // Controls the reusable dialog
+    const [dialog, setDialog] = useState({
+        isOpen: false,
+        title: "",
+        message: "",
+        type: "info",
+        confirmText: "OK",
+    });
 
     // ----------------------------------------
     // CREATE PRODUCT FORM STATE
@@ -47,6 +59,26 @@ export default function Products({ onViewDetail }) {
     });
 
     // ----------------------------------------
+    // DIALOG HANDLER
+    // Opens a dialog with specified parameters
+    // Open dialog with dynamic configuration
+    function openDialog(config) {
+        setDialog({
+            ...config,
+            isOpen: true,
+        });
+    }
+
+    // Close the currently displayed dialog
+    function closeDialog() {
+        setDialog((prev) => ({
+            ...prev,
+            isOpen: false,
+        }));
+    }
+
+
+    // ----------------------------------------
     // FETCH PRODUCT LIST
     // Retrieves products from backend API
     // ----------------------------------------
@@ -71,6 +103,13 @@ export default function Products({ onViewDetail }) {
     useEffect(() => {
         loadProducts();
     }, []);
+
+    // Filter products based on the selected tab
+    const filteredProducts = products.filter((product) =>
+        activeTab === "active"
+            ? product.is_active === true
+            : product.is_active === false
+    );
 
     if (loading) {
         return <div className="p-8 text-slate-400">Loading products...</div>;
@@ -144,34 +183,33 @@ export default function Products({ onViewDetail }) {
         setSuccess("");
     }
 
-    // Menonaktifkan produk tanpa menghapus data dari database
-    async function handleDeactivateProduct(product) {
-        const confirmed = window.confirm(
-            `Apakah kamu yakin ingin menonaktifkan produk ${product.name}?`
-        );
+    // Update product active status
+    function handleUpdateProductStatus(product) {
+        const newStatus = !product.is_active;
 
-        // Batalkan proses jika pengguna memilih Cancel
-        if (!confirmed) return;
+        openDialog({
+            title: newStatus
+                ? "Reactivate Product"
+                : "Deactivate Product",
 
-        setSuccess("");
-        setFormError("");
+            message: `Apakah kamu yakin ingin ${
+                newStatus ? "mengaktifkan kembali" : "menonaktifkan"
+            } produk ${product.name}?`,
 
-        try {
-            await deleteProduct(product.id);
+            type: "confirm",
 
-            setSuccess("Produk berhasil dinonaktifkan!");
+            confirmText: newStatus ? "Reactivate" : "Deactivate",
+            cancelText: "Cancel",
 
-            // Ambil ulang daftar produk setelah proses berhasil
-            await loadProducts();
-        } catch (err) {
-            setFormError(err.message);
-        }
+            onConfirm: () => processProductStatus(product.id, newStatus),
+        });
     }
 
     // ==========================================
     // RENDER UI
     // ==========================================
     return (
+        <>
         <div className="p-8">
             <div className="mb-6 flex items-center justify-between">
                 <div>
@@ -309,6 +347,32 @@ export default function Products({ onViewDetail }) {
 
 
             <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+
+                {/* Product Status Tabs */}
+                <div className="mb-4 flex gap-2 border-b border-slate-200">
+                    <button
+                        onClick={() => setActiveTab("active")}
+                        className={`px-4 py-3 text-sm font-medium ${
+                            activeTab === "active"
+                                ? "border-b-2 border-emerald-500 text-emerald-600"
+                                : "text-slate-500 hover:text-slate-800"
+                        }`}
+                    >
+                        Active Products
+                    </button>
+
+                    <button
+                        onClick={() => setActiveTab("inactive")}
+                        className={`px-4 py-3 text-sm font-medium ${
+                            activeTab === "inactive"
+                                ? "border-b-2 border-emerald-500 text-emerald-600"
+                                : "text-slate-500 hover:text-slate-800"
+                        }`}
+                    >
+                        Inactive Products
+                    </button>
+                </div>
+
                 <table className="w-full text-left text-sm">
                     <thead className="bg-slate-50 text-slate-500">
                         <tr>
@@ -321,7 +385,7 @@ export default function Products({ onViewDetail }) {
                     </thead>
 
                     <tbody className="divide-y divide-slate-100">
-                        {products.map((product) => (
+                        {filteredProducts.map((product) => (    
                             <tr key={product.id} className="hover:bg-slate-50">
                                 <td className="px-6 py-4 font-mono">
                                     {product.sku}
@@ -363,20 +427,26 @@ export default function Products({ onViewDetail }) {
                                             Edit
                                         </button>
                                         <button
-                                            onClick={() => handleDeactivateProduct(product)}
-                                            className="rounded-lg bg-red-500 px-3 py-2 text-sm text-white hover:bg-red-600"
+                                            onClick={() => handleUpdateProductStatus(product)}
+                                            className={`rounded-lg px-3 py-2 text-sm text-white ${
+                                                product.is_active
+                                                    ? "bg-red-500 hover:bg-red-600"
+                                                    : "bg-emerald-500 hover:bg-emerald-600"
+                                            }`}
                                         >
-                                            Deactivate
+                                            {product.is_active ? "Deactivate" : "Reactivate"}
                                         </button>
                                     </div>
                                 </td>
                             </tr>
                         ))}
 
-                        {products.length === 0 && (
+                        {filteredProducts.length === 0 && (
                             <tr>
                                 <td colSpan={5} className="px-6 py-10 text-center text-slate-500">
-                                    Belum ada produk.
+                                    {activeTab === "active"
+                                    ? "Belum ada produk aktif."
+                                    : "Belum ada produk inactive."}
                                 </td>
                             </tr>
                         )}
@@ -385,9 +455,21 @@ export default function Products({ onViewDetail }) {
             </div>
 
             <p className="mt-4 text-sm text-slate-500">
-                Total {products.length} produk
+                Total {filteredProducts .length} produk
             </p>
+
+            <DialogBox
+                isOpen={dialog.isOpen}
+                title={dialog.title}
+                message={dialog.message}
+                type={dialog.type}
+                confirmText={dialog.confirmText}
+                cancelText={dialog.cancelText}
+                onConfirm={dialog.onConfirm}
+                onCancel={closeDialog}
+            />
         </div>
+        </>
     );
 }
 

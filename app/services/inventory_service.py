@@ -10,7 +10,7 @@ def get_all_inventory(db: Session):
     # Ambil inventory beserta relasi Product
     statement = (
         select(Inventory)
-        .options(selectinload(Inventory.product))   
+        .options(selectinload(Inventory.product))
         .order_by(Inventory.product_id)
     )
 
@@ -27,6 +27,7 @@ def get_all_inventory(db: Session):
             product_name=inventory.product.name,
             on_hand=inventory.on_hand,
             available_qty=inventory.available_qty,
+            is_active=inventory.product.is_active
         )
         for inventory in inventory_list
     ]

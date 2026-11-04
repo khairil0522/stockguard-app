@@ -56,13 +56,7 @@ def create_product_with_inventory(
         raise
 
 def get_all_products(db: Session):
-    statement = select(Product).order_by(Product.name).where(Product.is_active==True)
-    products = db.scalars(statement).all()
-
-    return products
-
-def get_all_products_deleted(db: Session):
-    statement = select(Product).order_by(Product.name).where(Product.is_active==False)
+    statement = select(Product).order_by(Product.name)
     products = db.scalars(statement).all()
 
     return products
@@ -99,31 +93,18 @@ def update_product_without_inventory(
 
     return product
 
-def remove_product(
+def restatus_product(
     db: Session,
-    product_id: UUID
+    product_id: UUID,
+    is_active: bool
 ):
     product = db.get(Product, product_id)
 
     if product is None:
         raise ProductNotFoundError()
     
-    product.is_active = False
-    db.commit()
-    db.refresh(product)
+    product.is_active = is_active
 
-    return product
-
-def restore_product(
-    db: Session,
-    product_id: UUID
-):
-    product = db.get(Product, product_id)
-
-    if product is None:
-        raise ProductNotFoundError()
-    
-    product.is_active = True
     db.commit()
     db.refresh(product)
 

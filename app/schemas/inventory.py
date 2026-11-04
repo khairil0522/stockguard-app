@@ -15,6 +15,7 @@ class InventoryListRead(BaseModel):
     product_name: str
     on_hand: int
     available_qty: int
+    is_active: bool
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -139,10 +139,12 @@ export default function StockAdjustments() {
                                     : "Choose a product"}
                             </option>
 
-                            {products.map((product) => (
-                                <option key={product.id} value={product.id}>
-                                    {product.sku} - {product.name}
-                                </option>
+                            {products
+                                .filter((product) => product.is_active)
+                                .map((product) => (
+                                    <option key={product.id} value={product.id}>
+                                        {product.sku} - {product.name}
+                                    </option>
                             ))}
                         </select>
                     </div>
