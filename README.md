@@ -45,11 +45,20 @@ Its main objective is to ensure that stock quantities remain consistent while su
 - [x] Dashboard
 - [x] Product listing
 - [x] Product creation
-- [x] Latest stock movement overview
 - [x] Product detail
 - [x] Product information
+- [x] Product update
+- [x] Product deactivation (soft delete)
 - [x] Inventory overview
+- [x] Inventory detail
 - [x] Product-specific stock movement history
+- [x] Stock adjustment form
+- [x] Product selection for stock adjustment
+- [x] INCREASE / DECREASE selection
+- [x] Stock adjustment submission
+- [x] Submission loading state and double-submit prevention
+- [x] Success and error notifications
+- [x] Form reset after successful adjustment
 
 ---
 
@@ -65,7 +74,7 @@ Its main objective is to ensure that stock quantities remain consistent while su
 | Frontend | React |
 | Build Tool | Vite |
 | Styling | Tailwind CSS |
-| HTTP Client | Fetch API / Axios (migration in progress) |
+| HTTP Client | Axios |
 | API Documentation | Swagger UI |
 
 ---
@@ -168,6 +177,12 @@ http://localhost:8000/api/v1
 | DELETE | `/products/{product_id}` | Deactivate product (soft delete) |
 
 ### Stock Adjustment
+
+Stock adjustments support two movement types:
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/stocks/products/{product_id}/stock-adjustments` | Create a stock adjustment |
 
 Stock adjustments support two movement types:
 
@@ -286,8 +301,8 @@ http://localhost:5173
 - [x] Dashboard
 - [x] Product management frontend
 - [x] Product detail frontend
-- [ ] Product update and deactivation frontend
-- [ ] Stock adjustment frontend
+- [x] Product update and deactivation frontend
+- [x] Stock adjustment frontend
 - [ ] Stock reservation workflow
 - [ ] Booking management
 - [ ] Authentication and authorization
