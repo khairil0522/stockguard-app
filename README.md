@@ -2,9 +2,9 @@
 
 ### Inventory Management & Stock Reservation API
 
-**StockGuard** is an inventory management and stock reservation application built to manage product data, monitor stock levels, and maintain accurate inventory movements.
+**StockGuard** is an inventory management, stock reservation, and booking platform built to manage product data, monitor stock levels, maintain accurate inventory movements, and support reservation workflows.
 
-The project focuses on backend engineering practices, data integrity, and reliable stock management using a modern Python-based technology stack.
+The project focuses on backend engineering practices, data integrity, transaction management, and reliable stock management using a modern Python-based technology stack.
 
 ---
 
@@ -12,7 +12,12 @@ The project focuses on backend engineering practices, data integrity, and reliab
 
 StockGuard provides an API-driven inventory management system with a web-based frontend.
 
-Its main objective is to ensure that stock quantities remain consistent while supporting stock adjustments and future reservation workflows.
+Its main objectives are:
+- Maintain consistent inventory quantities.
+- Support stock adjustments and reservation workflows.
+- Manage users, roles, and permissions.
+- Provide secure and structured access control.
+- Maintain data integrity through database constraints and transaction handling.
 
 ## ✨ Features
 
@@ -32,6 +37,20 @@ Its main objective is to ensure that stock quantities remain consistent while su
 - [x] Reserved stock validation
 - [x] Stock movement history
 - [x] Database row locking using `SELECT FOR UPDATE`
+
+### User Management & RBAC
+- [x] User model
+- [x] Role model
+- [x] Permission model
+- [x] User-role association model
+- [x] Role-permission association model
+- [x] ORM relationships using SQLAlchemy
+- [x] Initial Alembic migration generated and reviewed
+- [ ] Customer-specific profile (`UserCustomer`)
+- [ ] User registration
+- [ ] User authentication
+- [ ] Role and permission assignment workflows
+- [ ] Backend permission enforcement
 
 ### Data Validation & Integrity
 - [x] Duplicate SKU prevention
@@ -156,6 +175,35 @@ Records inventory changes, including:
 - New stock
 - Reason for adjustment
 
+### User Management & RBAC
+
+StockGuard uses a Role-Based Access Control (RBAC) foundation.
+
+The current design separates user identity, role assignment, and permission definitions.
+
+| Model | Responsibility |
+|---|---|
+| `User` | Stores user identity and authentication-related data |
+| `Role` | Defines user roles such as ADMIN, STAFF, and CUSTOMER |
+| `Permission` | Defines application permissions |
+| `UserRole` | Associates users with roles |
+| `RolePermission` | Associates roles with permissions |
+
+The association tables use composite primary keys to prevent duplicate assignments.
+
+The `UserRole` model also records:
+
+- `assigned_by`: User who assigned the role
+- `assigned_at`: Role assignment timestamp
+
+The current ORM relationships use SQLAlchemy `relationship()` and `back_populates` to support bidirectional object navigation.
+
+### Customer Profile
+
+A separate `UserCustomer` profile is planned for customer-specific information.
+
+This keeps common identity and authentication data in `User`, while optional customer information is maintained separately.
+
 ---
 
 ## 🔌 API Overview
@@ -178,13 +226,11 @@ http://localhost:8000/api/v1
 
 ### Stock Adjustment
 
-Stock adjustments support two movement types:
-
 | Method | Endpoint | Description |
 |---|---|---|
 | POST | `/stocks/products/{product_id}/stock-adjustments` | Create a stock adjustment |
 
-Stock adjustments support two movement types:
+Supported movement types:
 
 | Movement | Description |
 |---|---|
@@ -303,9 +349,14 @@ http://localhost:5173
 - [x] Product detail frontend
 - [x] Product update and deactivation frontend
 - [x] Stock adjustment frontend
+- [x] User Management and RBAC database models
+- [x] Initial User Management and RBAC migration generation
+- [ ] Customer profile model (`UserCustomer`)
+- [ ] User registration and authentication
+- [ ] Role and permission management workflows
+- [ ] Backend authorization enforcement
 - [ ] Stock reservation workflow
 - [ ] Booking management
-- [ ] Authentication and authorization
 - [ ] Automated integration testing
 
 ---
@@ -319,6 +370,7 @@ StockGuard is also a practical engineering project focused on:
 - Database transaction management
 - Concurrency control
 - Inventory consistency
+- Role-Based Access Control (RBAC)
 - Backend and frontend integration
 - Scalable application architecture
 
@@ -328,7 +380,9 @@ StockGuard is also a practical engineering project focused on:
 
 **Active Development**
 
-StockGuard is currently under development. Features and architecture may evolve as new modules are implemented.
+StockGuard is currently under development. Product Management, Inventory Management, and Stock Adjustment features have been implemented. User Management and RBAC database models have been defined, with their initial migration generated and reviewed.
+
+Authentication, authorization enforcement, customer profiles, and stock reservation workflows remain under development.
 
 ---
 
