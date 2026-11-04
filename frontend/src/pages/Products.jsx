@@ -132,23 +132,36 @@ export default function Products({ onViewDetail }) {
         event.preventDefault();
 
         setSaving(true);
-        setSuccess("");
-        setFormError("");
 
         try {
             const productData = {
                 name: form.name.trim(),
                 unit_price: Number(form.unit_price),
                 description: form.description.trim(),
-            }
+            };
 
             if (editingProduct) {
                 await updateProduct(editingProduct.id, productData);
-                setSuccess("Produk berhasil diperbarui!");
+
+                openDialog({
+                    title: "Success",
+                    message: "Produk berhasil diperbarui!",
+                    type: "success",
+                    confirmText: "OK",
+                    onConfirm: closeDialog,
+                });
             } else {
                 productData.sku = form.sku.trim();
+
                 await createProduct(productData);
-                setSuccess("Produk berhasil dibuat!");
+
+                openDialog({
+                    title: "Success",
+                    message: "Produk berhasil dibuat!",
+                    type: "success",
+                    confirmText: "OK",
+                    onConfirm: closeDialog,
+                });
             }
 
             setForm({
@@ -160,9 +173,23 @@ export default function Products({ onViewDetail }) {
 
             setShowForm(false);
             setEditingProduct(null);
+
             await loadProducts();
+
         } catch (err) {
-            setFormError(err.message);
+            console.log("FULL ERROR:", err);
+            console.log("RESPONSE DATA:", err.response?.data);
+
+            openDialog({
+                title: "Operation Failed",
+                message:
+                    err.response?.data?.detail ||
+                    err.message ||
+                    "Terjadi kesalahan saat menyimpan produk.",
+                type: "error",
+                confirmText: "OK",
+                onConfirm: closeDialog,
+            });
         } finally {
             setSaving(false);
         }
@@ -204,6 +231,40 @@ export default function Products({ onViewDetail }) {
             onConfirm: () => processProductStatus(product.id, newStatus),
         });
     }
+
+    async function processProductStatus(productId, newStatus) {
+        closeDialog();
+
+        try {
+            await updateProductStatus(productId, newStatus);
+
+            await loadProducts();
+
+            openDialog({
+                title: "Success",
+                message: newStatus
+                    ? "Produk berhasil diaktifkan kembali!"
+                    : "Produk berhasil dinonaktifkan!",
+                type: "success",
+                confirmText: "OK",
+                onConfirm: closeDialog,
+            });
+
+        } catch (err) {
+            const errorMessage =
+                err.response?.data?.detail ||
+                err.message ||
+                "Terjadi kesalahan saat mengubah status produk.";
+
+            openDialog({
+                title: "Gagal Mengubah Status Produk",
+                message: errorMessage,
+                type: "error",
+                confirmText: "OK",
+                onConfirm: closeDialog,
+            });
+        }
+    }   
 
     // ==========================================
     // RENDER UI

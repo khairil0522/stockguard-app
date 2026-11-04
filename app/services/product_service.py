@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import Inventory, Product
 from app.schemas.product import ProductCreate, ProductUpdate
-from app.errors.product import DuplicateSKUError, ProductNotFoundError
+from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError
+from app.errors.inventory import InventoryNotFoundError
 
 def create_product_with_inventory(
     db: Session,
@@ -17,7 +18,7 @@ def create_product_with_inventory(
             )
 
             if existing_product is not None:
-                raise DuplicateSKUError(payload.sku)
+                raise DuplicateSKUError(f"SKU {payload.sku} sudah digunakan oleh produk lain.")
 
             product = Product(
                 sku=payload.sku,
@@ -51,7 +52,9 @@ def create_product_with_inventory(
         )
 
         if constraint and "sku" in constraint.lower():
-            raise DuplicateSKUError(payload.sku) from exc
+            raise DuplicateSKUError(
+                f"SKU {payload.sku} sudah digunakan oleh produk lain."
+            ) from exc
 
         raise
 
@@ -102,6 +105,17 @@ def restatus_product(
 
     if product is None:
         raise ProductNotFoundError()
+
+    inventory = db.scalar(
+        select(Inventory).where(Inventory.product_id == product_id).with_for_update()
+    )
+
+    if not is_active:
+        if inventory is None:
+            raise InventoryNotFoundError()
+
+        if inventory.on_hand > 0 or inventory.reserved_qty > 0:
+            raise ProductHasStockError("Produk masih memiliki stok yang tersedia dan tidak dapat dinonaktifkan.")
     
     product.is_active = is_active
 

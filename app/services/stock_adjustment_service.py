@@ -7,6 +7,7 @@ from app.models import Inventory, StockMovement, Product
 from app.schemas.stock_movement import StockAdjustmentCreate
 
 from app.errors.stock import InsufficientStockError, StockNotFoundError
+from app.errors.product import ProductNotFoundError, ProductInactiveError
 
 def adjust_stock(
     db: Session,
@@ -22,6 +23,14 @@ def adjust_stock(
 
         if inventory is None:
             raise ProductNotFoundError(product_id)
+
+        product = db.get(Product, product_id)
+
+        if product is None:
+            raise ProductNotFoundError()
+
+        if not product.is_active:
+            raise ProductInactiveError("Produk tidak aktif, tidak dapat melakukan penyesuaian stok")
 
         previous_on_hand = inventory.on_hand
 

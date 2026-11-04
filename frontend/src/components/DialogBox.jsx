@@ -55,7 +55,10 @@
 
                         {/* Confirm Button */}
                         <button
-                            onClick={onConfirm}
+                            onClick={() => {
+                                console.log("Confirm button clicked");
+                                onConfirm?.();
+                            }}
                             className={`rounded-lg px-4 py-2 text-sm font-medium text-white ${
                                 buttonStyles[type] || buttonStyles.info
                             }`}
