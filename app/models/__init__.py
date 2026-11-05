@@ -10,6 +10,7 @@ from app.models.roles import Role
 from app.models.permissions import Permission
 from app.models.user_roles import UserRole
 from app.models.role_permissions import RolePermission
+from app.models.user_customers import UserCustomer
 
 
 __all__ = [
@@ -24,4 +25,5 @@ __all__ = [
     "Permission",
     "UserRole",
     "RolePermission",
+    "UserCustomer",
 ]

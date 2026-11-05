@@ -1,6 +1,6 @@
 from sqlalchemy import select, func
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timedelta, timezone
 from nanoid import generate
 from uuid import UUID
@@ -22,11 +22,11 @@ def get_expiry_time():
     waktu_kedaluwarsa = waktu_sekarang + timedelta(minutes=15)
     return waktu_kedaluwarsa
 
-def create_booking_with_items(
-    db: Session,
+async def create_booking_with_items(
+    db: AsyncSession,
     payload: BookingCreate,
     ) -> Booking:
-    with db.begin():
+    async with db.begin():
         BOOKING_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
         booking = Booking(
@@ -36,17 +36,17 @@ def create_booking_with_items(
         )
 
         db.add(booking)
-        db.flush()
+        await db.flush()
 
         for item in payload.items:
-            product = db.scalar(
+            product = await db.scalar(
                 select(Product).where(Product.id == item.product_id)
             )
 
             if product is None:
                 raise(ProductNotFoundError())
 
-            cek_inventory = db.scalar(
+            cek_inventory = await db.scalar(
                 select(Inventory).where(Inventory.product_id == product.id).with_for_update()
             )
 
@@ -69,26 +69,27 @@ def create_booking_with_items(
         
         return booking
 
-def expired_booking(db: Session, id: UUID):
+async def expired_booking(db: AsyncSession, id: UUID):
     waktu_sekarang = datetime.now(timezone.utc)
 
-    with db.begin():
-        get_booking = db.scalar(
+    async with db.begin():
+        get_booking = await db.scalar(
             select(Booking).where(Booking.id == id).with_for_update()
         )
 
         if get_booking is None :
             raise(BookingNotFoundError())
 
-        get_booking_items = db.scalars(
+        result = await db.scalars(
             select(BookingItem).where(BookingItem.booking_id == get_booking.id)
-        ).all()
+        )
+        get_booking_items = result.all()
 
         if get_booking.expired_at <= waktu_sekarang and get_booking.booking_status == BookingStatus.PENDING:
             get_booking.booking_status = BookingStatus.EXPIRED
 
             for item in get_booking_items:
-                get_inventory = db.scalar(
+                get_inventory = await db.scalar(
                     select(Inventory).where(Inventory.product_id == item.product_id).with_for_update()
                 )
 
@@ -97,24 +98,25 @@ def expired_booking(db: Session, id: UUID):
 
                 get_inventory.reserved_qty -= item.qty
 
-def cancellation_booking(db: Session, id:UUID):
-    with db.begin():
-        get_booking = db.scalar(
+async def cancellation_booking(db: AsyncSession, id:UUID):
+    async with db.begin():
+        get_booking = await db.scalar(
             select(Booking).where(Booking.id == id).with_for_update()
         )
 
         if get_booking is None:
             raise(BookingNotFoundError())
         
-        get_booking_items = db.scalars(
+        result = await db.scalars(
             select(BookingItem).where(BookingItem.booking_id == get_booking.id)
-        ).all()
+        )
+        get_booking_items = result.all()
 
         if get_booking.booking_status == BookingStatus.PENDING:
             get_booking.booking_status = BookingStatus.CANCELLED
 
             for item in get_booking_items:
-                get_inventory = db.scalar(
+                get_inventory = await db.scalar(
                     select(Inventory).where(Inventory.product_id == item.product_id).with_for_update()
                 )
 
@@ -126,24 +128,25 @@ def cancellation_booking(db: Session, id:UUID):
         else:
             raise(BookingCannotBeCancelledError())
 
-def confirmed_booking(db: Session, id:UUID):
-    with db.begin():
-        get_booking = db.scalar(
+async def confirmed_booking(db: AsyncSession, id:UUID):
+    async with db.begin():
+        get_booking = await db.scalar(
             select(Booking).where(Booking.id == id).with_for_update()
         )
 
         if get_booking is None:
             raise(BookingNotFoundError())
         
-        get_booking_items = db.scalars(
+        result = await db.scalars(
             select(BookingItem).where(BookingItem.booking_id == get_booking.id)
-        ).all()
+        )
+        get_booking_items = result.all()
 
         if get_booking.booking_status == BookingStatus.PENDING:
             get_booking.booking_status = BookingStatus.CONFIRMED
 
             for item in get_booking_items:
-                get_inventory = db.scalar(
+                get_inventory = await db.scalar(
                     select(Inventory).where(Inventory.product_id == item.product_id).with_for_update()
                 )
 

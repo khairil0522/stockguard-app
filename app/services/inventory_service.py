@@ -1,12 +1,13 @@
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Inventory, Product
 from app.errors.inventory import InventoryNotFoundError
 from app.schemas.inventory import InventoryListRead, InventoryDetailRead
 
-def get_all_inventory(db: Session):
+async def get_all_inventory(db: AsyncSession):
     # Ambil inventory beserta relasi Product
     statement = (
         select(Inventory)
@@ -14,7 +15,8 @@ def get_all_inventory(db: Session):
         .order_by(Inventory.product_id)
     )
 
-    inventory_list = db.scalars(statement).all()
+    result = await db.scalars(statement)
+    inventory_list = result.all()
 
     if not inventory_list:
         raise InventoryNotFoundError()
@@ -32,7 +34,7 @@ def get_all_inventory(db: Session):
         for inventory in inventory_list
     ]
 
-def get_inventory_by_id(db: Session, product_id: UUID):
+async def get_inventory_by_id(db: AsyncSession, product_id: UUID):
     # Ambil inventory beserta relasi Product
     statement = (
         select(Inventory)
@@ -40,7 +42,7 @@ def get_inventory_by_id(db: Session, product_id: UUID):
         .options(selectinload(Inventory.product))
     )
 
-    get_inventory = db.scalar(statement)
+    get_inventory = await db.scalar(statement)
 
     if get_inventory is None:
         raise InventoryNotFoundError()

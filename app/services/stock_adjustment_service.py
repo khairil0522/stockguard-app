@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Inventory, StockMovement, Product
 from app.schemas.stock_movement import StockAdjustmentCreate
@@ -9,13 +9,13 @@ from app.schemas.stock_movement import StockAdjustmentCreate
 from app.errors.stock import InsufficientStockError, StockNotFoundError
 from app.errors.product import ProductNotFoundError, ProductInactiveError
 
-def adjust_stock(
-    db: Session,
+async def adjust_stock(
+    db: AsyncSession,
     product_id: UUID,
     payload: StockAdjustmentCreate,
 ) -> StockMovement:
-    with db.begin():
-        inventory = db.scalar(
+    async with db.begin():
+        inventory = await db.scalar(
             select(Inventory)
             .where(Inventory.product_id == product_id)
             .with_for_update()
@@ -24,7 +24,7 @@ def adjust_stock(
         if inventory is None:
             raise ProductNotFoundError(product_id)
 
-        product = db.get(Product, product_id)
+        product = await db.get(Product, product_id)
 
         if product is None:
             raise ProductNotFoundError()
@@ -56,16 +56,24 @@ def adjust_stock(
         )
 
         db.add(movement)
-        db.flush()
+        await db.flush()
 
     return movement
 
-def get_stock_adjustment(db: Session):
-    get_stocks = (
-        db.query(StockMovement, Product.name.label("product_name"))
+async def get_stock_adjustment(db: AsyncSession):
+    statement = (
+        select(
+            StockMovement,
+            Product.name.label("product_name")
+        )
         .join(Product, Product.id == StockMovement.product_id)
-        .order_by(StockMovement.created_at.desc()).limit(5).all()
+        .order_by(StockMovement.created_at.desc())
+        .limit(5)
     )
+
+    result = await db.execute(statement)
+    get_stocks = result.all()
+
     if len(get_stocks) == 0:
         raise(StockNotFoundError())
 
@@ -83,17 +91,19 @@ def get_stock_adjustment(db: Session):
         for movement, product_name in get_stocks
 ]
 
-def get_stock_adjustment_by_product(db: Session, product_id: UUID):
-    get_stock = (
-        db.query(
-            StockMovement,
-            Product.name.label("product_name")
-        )
-        .join(Product, Product.id == StockMovement.product_id)
-        .where(StockMovement.product_id == product_id)
-        .order_by(StockMovement.created_at.desc())
-        .all()
+async def get_stock_adjustment_by_product(db: AsyncSession, product_id: UUID):
+    statement = (
+        select(
+                    StockMovement,
+                    Product.name.label("product_name")
+                )
+                .join(Product, Product.id == StockMovement.product_id)
+                .where(StockMovement.product_id == product_id)
+                .order_by(StockMovement.created_at.desc())
     )
+
+    result = await db.execute(statement)
+    get_stock = result.all()
 
     if not get_stock:
         return []

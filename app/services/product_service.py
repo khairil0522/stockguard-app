@@ -1,19 +1,20 @@
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Inventory, Product
 from app.schemas.product import ProductCreate, ProductUpdate
 from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError
 from app.errors.inventory import InventoryNotFoundError
 
-def create_product_with_inventory(
-    db: Session,
+async def create_product_with_inventory(
+    db: AsyncSession,
     payload: ProductCreate,
     ) -> Product:
     try:
-        with db.begin():
-            existing_product = db.scalar(
+        async with db.begin():
+            existing_product = await db.scalar(
                 select(Product).where(Product.sku == payload.sku)
             )
 
@@ -29,7 +30,7 @@ def create_product_with_inventory(
             )
 
             db.add(product)
-            db.flush()
+            await db.flush()
 
             inventory = Inventory(
                 product_id=product.id,
@@ -38,7 +39,7 @@ def create_product_with_inventory(
             )
 
             db.add(inventory)
-            db.flush()
+            await db.flush()
 
         return product
 
@@ -58,30 +59,31 @@ def create_product_with_inventory(
 
         raise
 
-def get_all_products(db: Session):
+async def get_all_products(db: AsyncSession):
     statement = select(Product).order_by(Product.name)
-    products = db.scalars(statement).all()
+    result = await db.scalars(statement)
+    products = result.all()
 
     return products
 
-def get_detail_product(db: Session, product_id : UUID):
+async def get_detail_product(db: AsyncSession, product_id : UUID):
     statement = (
         select(Product)
         .options(selectinload(Product.inventory))
         .where(Product.id == product_id)
-    )   
-    product = db.scalar(statement)
+    )
+    product = await db.scalar(statement)
     if product is None:
         raise ProductNotFoundError()
     
     return product
 
-def update_product_without_inventory(
-    db: Session,
+async def update_product_without_inventory(
+    db: AsyncSession,
     product_id : UUID,
     payload : ProductUpdate
 ):
-    product = db.get(Product, product_id)
+    product = await db.get(Product, product_id)
 
     if product is None:
         raise ProductNotFoundError()
@@ -91,22 +93,22 @@ def update_product_without_inventory(
     for field, value in update_data.items():
         setattr(product, field, value)
 
-    db.commit()
-    db.refresh(product)
+    await db.commit()
+    await db.refresh(product)
 
     return product
 
-def restatus_product(
-    db: Session,
+async def restatus_product(
+    db: AsyncSession,
     product_id: UUID,
     is_active: bool
 ):
-    product = db.get(Product, product_id)
+    product = await db.get(Product, product_id)
 
     if product is None:
         raise ProductNotFoundError()
 
-    inventory = db.scalar(
+    inventory = await db.scalar(
         select(Inventory).where(Inventory.product_id == product_id).with_for_update()
     )
 
@@ -119,7 +121,7 @@ def restatus_product(
     
     product.is_active = is_active
 
-    db.commit()
-    db.refresh(product)
+    await db.commit()
+    await db.refresh(product)
 
     return product
