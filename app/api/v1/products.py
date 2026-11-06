@@ -1,13 +1,11 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.product import ProductCreate, ProductRead, ProductDetailRead, ProductUpdate, ProductStatusUpdate, ProductResponse
 from app.services.product_service import create_product_with_inventory, get_detail_product, get_all_products, update_product_without_inventory, restatus_product
 from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError, ProductInactiveError
-from app.models.products import Product
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -17,12 +15,12 @@ router = APIRouter(prefix="/products", tags=["Products"])
     response_model=ProductRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_product(
+async def create_product(
     payload: ProductCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        return create_product_with_inventory(db, payload)
+        return await create_product_with_inventory(db, payload)
     except DuplicateSKUError as exc:
         raise HTTPException(
             status_code=exc.status_code,
@@ -35,8 +33,8 @@ def create_product(
     response_model=list[ProductRead],
     status_code=status.HTTP_200_OK,
 )
-def get_products(db: Session = Depends(get_db)):
-    return get_all_products(db)
+async def get_products(db: AsyncSession = Depends(get_db)):
+    return await get_all_products(db)
 
 
 @router.get(
@@ -44,12 +42,12 @@ def get_products(db: Session = Depends(get_db)):
     response_model=ProductDetailRead,
     status_code=status.HTTP_200_OK,
 )
-def get_product_detail(
+async def get_product_detail(
     product_id : UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        return get_detail_product(db, product_id)
+        return await get_detail_product(db, product_id)
     except ProductNotFoundError as exc :
         raise HTTPException(
             status_code=exc.status_code,
@@ -61,13 +59,13 @@ def get_product_detail(
     response_model=ProductRead,
     status_code=status.HTTP_200_OK,
 )
-def update_product(
+async def update_product(
     payload: ProductUpdate,
     product_id : UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        return update_product_without_inventory(db, product_id, payload)
+        return await update_product_without_inventory(db, product_id, payload)
     except ProductNotFoundError as exc :
         raise HTTPException(
             status_code=exc.status_code,
@@ -79,13 +77,13 @@ def update_product(
     response_model=ProductResponse,
     status_code=status.HTTP_200_OK,
 )
-def update_product_status(
+async def update_product_status(
     product_id : UUID,
     payload: ProductStatusUpdate,
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ):
     try:
-        return restatus_product(db, product_id, payload.is_active)
+        return await restatus_product(db, product_id, payload.is_active)
     except ProductNotFoundError as exc :
         raise HTTPException(
             status_code=exc.status_code,

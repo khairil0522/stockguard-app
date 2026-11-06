@@ -2,7 +2,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.booking import BookingCreate
@@ -29,12 +29,12 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
     "",
     status_code=status.HTTP_201_CREATED,
 )
-def create_booking(
+async def create_booking(
     payload: BookingCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        return create_booking_with_items(db, payload)
+        return await create_booking_with_items(db, payload)
     except ProductNotFoundError as exc:
         raise HTTPException(
             status_code = exc.status_code,
@@ -53,12 +53,12 @@ def create_booking(
 
 
 @router.post("/{booking_id}/confirm")
-def confirm_booking(
+async def confirm_booking(
     booking_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        confirmed_booking(db, booking_id)
+        await confirmed_booking(db, booking_id)
         return {
             "message": "Booking confirmed"
         }
@@ -80,12 +80,12 @@ def confirm_booking(
 
 
 @router.post("/{booking_id}/cancel")
-def cancel_booking(
+async def cancel_booking(
     booking_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        cancellation_booking(db, booking_id)
+        await cancellation_booking(db, booking_id)
         return {
             "message": "Booking cancelled"
         }

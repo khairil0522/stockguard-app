@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.stock_movement import (
@@ -26,13 +26,14 @@ router = APIRouter(prefix="/stocks", tags=["Stock Adjustments"])
     response_model=StockAdjustmentRead,
     status_code=status.HTTP_201_CREATED,
 )
-def create_stock_adjustment(
+async def create_stock_adjustment(
     product_id: UUID,
     payload: StockAdjustmentCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        movement = adjust_stock(db, product_id, payload)
+        movement = await adjust_stock(db, product_id, payload)
+        inventory = await db.get(Inventory, product_id)
 
         return {
             "id": movement.id,
@@ -43,7 +44,7 @@ def create_stock_adjustment(
             "new_on_hand": movement.new_on_hand,
             "available_qty": (
                 movement.new_on_hand
-                - db.get(Inventory, product_id).reserved_qty
+                - inventory.reserved_qty
             ),
             "reason": movement.reason,
         }
@@ -64,12 +65,11 @@ def create_stock_adjustment(
     "/",
     response_model=list[StockAdjustmentHistoryRead],
     status_code=status.HTTP_200_OK)
-def get_stocks(
-    db: Session = Depends(get_db),
+async def get_stocks(
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        stock_list = get_stock_adjustment(db)
-        return stock_list
+        return await get_stock_adjustment(db)
 
     except StockNotFoundError as exc:
         raise HTTPException(
@@ -81,13 +81,12 @@ def get_stocks(
     "/{product_id}",
     response_model=list[StockMovementHistoryByProduct],
     status_code=status.HTTP_200_OK)
-def get_stocks_by_product_id(
+async def get_stocks_by_product_id(
     product_id: UUID,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ):
     try:
-        stock_list = get_stock_adjustment_by_product(db, product_id)
-        return stock_list
+        return await get_stock_adjustment_by_product(db, product_id)
     except StockNotFoundError as exc:
         raise HTTPException(
             status_code=exc.status_code,
