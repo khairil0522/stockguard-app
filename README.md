@@ -4,7 +4,7 @@
 
 **StockGuard** is an inventory management, stock reservation, and booking platform built to manage product data, monitor stock levels, maintain accurate inventory movements, and support reservation workflows.
 
-The project focuses on backend engineering practices, data integrity, transaction management, and reliable stock management using a modern Python-based technology stack.
+The project focuses on backend engineering practices, data integrity, transaction management, concurrency control, and reliable stock management using a modern Python-based technology stack.
 
 ---
 
@@ -13,6 +13,7 @@ The project focuses on backend engineering practices, data integrity, transactio
 StockGuard provides an API-driven inventory management system with a web-based frontend.
 
 Its main objectives are:
+
 - Maintain consistent inventory quantities.
 - Support stock adjustments and reservation workflows.
 - Manage users, roles, and permissions.
@@ -22,14 +23,17 @@ Its main objectives are:
 ## ✨ Features
 
 ### Product Management
+
 - [x] Create new products
 - [x] Retrieve product list
 - [x] Retrieve product details
 - [x] View product inventory information
 - [x] Update product information
 - [x] Soft delete products using `is_active`
+- [x] Reactivate inactive products
 
 ### Inventory Management
+
 - [x] Automatic inventory initialization when creating a product
 - [x] Stock increase
 - [x] Stock decrease
@@ -39,28 +43,33 @@ Its main objectives are:
 - [x] Database row locking using `SELECT FOR UPDATE`
 
 ### User Management & RBAC
+
 - [x] User model
 - [x] Role model
 - [x] Permission model
 - [x] User-role association model
 - [x] Role-permission association model
+- [x] Customer profile model (`UserCustomer`)
 - [x] ORM relationships using SQLAlchemy
 - [x] Initial Alembic migration generated and reviewed
-- [ ] Customer-specific profile (`UserCustomer`)
+- [x] UserCustomer Alembic migration applied
 - [ ] User registration
-- [ ] User authentication
+- [x] User authentication
 - [ ] Role and permission assignment workflows
-- [ ] Backend permission enforcement
+- [x] Backend permission enforcement
 
 ### Data Validation & Integrity
+
 - [x] Duplicate SKU prevention
 - [x] Non-negative stock validation
 - [x] Reserved quantity cannot exceed on-hand quantity
 - [x] Insufficient stock protection
 - [x] Database constraints
 - [x] Transaction handling
+- [x] Row-level locking for concurrent stock adjustments
 
 ### Frontend
+
 - [x] Dashboard
 - [x] Product listing
 - [x] Product creation
@@ -68,6 +77,7 @@ Its main objectives are:
 - [x] Product information
 - [x] Product update
 - [x] Product deactivation (soft delete)
+- [x] Product reactivation
 - [x] Inventory overview
 - [x] Inventory detail
 - [x] Product-specific stock movement history
@@ -100,39 +110,101 @@ Its main objectives are:
 
 ## 🏗️ Architecture
 
-StockGuard follows a layered backend architecture to separate HTTP handling, business logic, and database operations.
+StockGuard follows a layered backend architecture with asynchronous database access to separate HTTP handling, business logic, and database operations.
 
 ```text
-              CLIENT
-                |
-                v
-        React + Vite Frontend
-                |
-                v
-           HTTP Request
-                |
-                v
-          FastAPI Router
-                |
-                v
-          Service Layer
-                |
-                v
-       SQLAlchemy ORM Layer
-                |
-                v
-           PostgreSQL
+                         CLIENT
+                           |
+                           v
+                  React + Vite Frontend
+                           |
+                           v
+                     HTTP Request
+                           |
+                           v
+                    FastAPI Application
+                           |
+                           v
+                  API Router Aggregator
+                    /api/v1/router.py
+                           |
+                           v
+                    Feature Router
+                           |
+                           v
+                    Service Layer
+                           |
+                           v
+              SQLAlchemy Async ORM Layer
+                           |
+                           v
+                      PostgreSQL
+```
+
+### Request Flow
+
+```text
+Client
+  ↓
+React + Vite
+  ↓
+HTTP Request
+  ↓
+FastAPI Router
+  ↓
+Feature Router
+  ↓
+Service Layer
+  ↓
+Async SQLAlchemy
+  ↓
+PostgreSQL
+  ↓
+Response
 ```
 
 ### Backend Responsibilities
 
 | Layer | Responsibility |
 |---|---|
-| Router | HTTP endpoints and response handling |
+| Main Application | FastAPI application setup, middleware, and router registration |
+| Router Aggregator | Combines versioned API routers under `/api/v1` |
+| Feature Router | Handles HTTP endpoints and response mapping |
 | Schema | Request validation and response serialization |
-| Service | Business logic and transaction handling |
+| Service | Business logic, transactions, and database operations |
 | Model | Database structure and relationships |
 | Database | Persistent data storage |
+
+### Async Database Architecture
+
+StockGuard uses SQLAlchemy 2.0 with `AsyncSession` for asynchronous database access.
+
+The database session is provided through FastAPI dependency injection:
+
+```python
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as db:
+        yield db
+```
+
+Database I/O operations use `await`, while SQLAlchemy query construction remains synchronous.
+
+Examples:
+
+```python
+result = await db.scalars(statement)
+items = result.all()
+```
+
+and:
+
+```python
+inventory = await db.scalar(
+    select(Inventory)
+    .where(Inventory.product_id == product_id)
+    .with_for_update()
+)
+```
 
 ---
 
@@ -148,6 +220,22 @@ Stores product information such as:
 - Description
 - Unit price
 - Active status
+
+Products use soft deactivation through the `is_active` field.
+
+Product status is managed through:
+
+```text
+PATCH /products/{product_id}/status
+```
+
+with an explicit status value:
+
+```json
+{
+  "is_active": false
+}
+```
 
 ### Inventory
 
@@ -173,6 +261,7 @@ Records inventory changes, including:
 - Quantity
 - Previous stock
 - New stock
+- Available stock
 - Reason for adjustment
 
 ### User Management & RBAC
@@ -181,7 +270,7 @@ StockGuard uses a Role-Based Access Control (RBAC) foundation.
 
 The current design separates user identity, role assignment, and permission definitions.
 
-| Model | Responsibility |
+| Model | Responsibility |  
 |---|---|
 | `User` | Stores user identity and authentication-related data |
 | `Role` | Defines user roles such as ADMIN, STAFF, and CUSTOMER |
@@ -198,11 +287,48 @@ The `UserRole` model also records:
 
 The current ORM relationships use SQLAlchemy `relationship()` and `back_populates` to support bidirectional object navigation.
 
+## Authentication & Authorization
+
+StockGuard uses JWT-based authentication and backend-enforced authorization.
+
+### Authentication
+
+- `POST /api/v1/auth/login` — authenticate user and obtain JWT access token.
+- `GET /api/v1/auth/me` — retrieve the currently authenticated user.
+- `GET /api/v1/auth/roles` — retrieve roles assigned to the authenticated user.
+- `GET /api/v1/auth/permissions` — retrieve permissions available to the authenticated user.
+
+Authentication uses the HTTP Bearer token scheme.
+
+### Authorization
+
+Authorization is enforced at the backend using role-based permissions.
+
+The `require_permission()` dependency checks whether the authenticated user has the required permission before the endpoint executes.
+
+Examples:
+
+- `dashboard.read`
+
+A valid JWT without the required permission results in HTTP `403 Forbidden`.
+
+Invalid, expired, malformed, or inactive-user authentication attempts result in HTTP `401 Unauthorized`.
+
+A user with the `*` permission is treated as having full permission access.
+
 ### Customer Profile
 
-A separate `UserCustomer` profile is planned for customer-specific information.
+`UserCustomer` stores customer-specific profile information separately from the common `User` identity.
 
-This keeps common identity and authentication data in `User`, while optional customer information is maintained separately.
+This keeps common identity and authentication-related data in `User`, while customer-specific information is maintained in a dedicated profile.
+
+Current customer profile fields include:
+
+- `phone_number`
+- `address`
+- `company_name`
+
+A customer profile belongs to one `User`, while each `User` can have zero or one `UserCustomer` profile.
 
 ---
 
@@ -214,6 +340,15 @@ Base URL:
 http://localhost:8000/api/v1
 ```
 
+### Authentication
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/auth/login` | Authenticate user and obtain JWT access token |
+| GET | `/api/v1/auth/me` | Get authenticated user information |
+| GET | `/api/v1/auth/roles` | Get authenticated user's roles |
+| GET | `/api/v1/auth/permissions` | Get authenticated user's permissions
+
 ### Product Endpoints
 
 | Method | Endpoint | Description |
@@ -222,7 +357,9 @@ http://localhost:8000/api/v1
 | GET | `/products` | Retrieve active products |
 | GET | `/products/{product_id}` | Retrieve product details and inventory |
 | PUT | `/products/{product_id}` | Update product information |
-| DELETE | `/products/{product_id}` | Deactivate product (soft delete) |
+| PATCH | `/products/{product_id}/status` | Activate or deactivate product |
+
+Product deactivation is implemented as a soft delete using `is_active`.
 
 ### Stock Adjustment
 
@@ -241,16 +378,16 @@ Supported movement types:
 
 | Method | Endpoint | Description |
 |---|---|---|
-| GET | `/stocks` | Retrieve latest stock movements |
+| GET | `/stocks/` | Retrieve latest stock movements |
 | GET | `/stocks/{product_id}` | Retrieve stock movements by product |
 
-Stock adjustments are validated against available inventory to prevent invalid stock operations.
+Stock adjustments are validated against inventory state to prevent invalid stock operations.
 
 ---
 
 ## 🔐 Data Integrity & Concurrency
 
-StockGuard uses database-level constraints and transaction handling to protect inventory consistency.
+StockGuard uses database-level constraints, transaction handling, and row-level locking to protect inventory consistency.
 
 One important implementation is row-level locking:
 
@@ -262,6 +399,13 @@ select(Inventory).where(
 
 This helps prevent concurrent stock operations from modifying the same inventory record without proper synchronization.
 
+Stock adjustment operations are executed inside database transactions:
+
+```python
+async with db.begin():
+    ...
+```
+
 The system also validates that:
 
 ```text
@@ -269,6 +413,8 @@ on_hand >= 0
 reserved_qty >= 0
 reserved_qty <= on_hand
 ```
+
+For stock decreases, the system prevents the operation when the resulting stock would fall below the reserved quantity.
 
 ---
 
@@ -338,8 +484,16 @@ http://localhost:5173
 
 ## 🗺️ Roadmap
 
+### Foundation
+
 - [x] Initial backend setup
 - [x] PostgreSQL integration
+- [x] SQLAlchemy 2.0 integration
+- [x] Async database session refactor
+- [x] Alembic migration setup
+
+### Product & Inventory
+
 - [x] Product CRUD
 - [x] Inventory initialization
 - [x] Stock adjustment
@@ -348,15 +502,35 @@ http://localhost:5173
 - [x] Product management frontend
 - [x] Product detail frontend
 - [x] Product update and deactivation frontend
+- [x] Product reactivation frontend
 - [x] Stock adjustment frontend
-- [x] User Management and RBAC database models
-- [x] Initial User Management and RBAC migration generation
-- [ ] Customer profile model (`UserCustomer`)
-- [ ] User registration and authentication
+
+### User Management & RBAC
+
+- [x] User Management database models
+- [x] Role database model
+- [x] Permission database model
+- [x] User-role association
+- [x] Role-permission association
+- [x] UserCustomer profile model
+- [x] Initial User Management and RBAC migration
+- [x] UserCustomer migration
+- [ ] User registration
+- [x] User authentication
 - [ ] Role and permission management workflows
-- [ ] Backend authorization enforcement
+- [x] Backend authorization enforcement
+
+### Reservation & Booking
+
 - [ ] Stock reservation workflow
 - [ ] Booking management
+- [ ] Booking lifecycle management
+- [ ] Customer booking ownership enforcement
+
+### Testing
+
+- [x] Unit testing for stock adjustment logic
+- [x] Validation and error handling tests
 - [ ] Automated integration testing
 
 ---
@@ -368,6 +542,7 @@ StockGuard is also a practical engineering project focused on:
 - RESTful API design
 - Clean separation of concerns
 - Database transaction management
+- Asynchronous database access
 - Concurrency control
 - Inventory consistency
 - Role-Based Access Control (RBAC)
@@ -380,9 +555,13 @@ StockGuard is also a practical engineering project focused on:
 
 **Active Development**
 
-StockGuard is currently under development. Product Management, Inventory Management, and Stock Adjustment features have been implemented. User Management and RBAC database models have been defined, with their initial migration generated and reviewed.
+StockGuard currently has the core Product Management, Inventory Management, Stock Adjustment, Dashboard, and frontend modules implemented.
 
-Authentication, authorization enforcement, customer profiles, and stock reservation workflows remain under development.
+The User Management and RBAC foundation has also been implemented at the database and ORM level, including user, role, permission, association models, and the `UserCustomer` profile.
+
+The application has been migrated to asynchronous database access using SQLAlchemy `AsyncSession` and PostgreSQL.
+
+JWT authentication and backend authorization enforcement have been implemented.
 
 ---
 

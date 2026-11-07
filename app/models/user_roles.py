@@ -61,8 +61,3 @@ class UserRole(Base):
         "User",
         foreign_keys=[assigned_by],
     )
-
-    role: Mapped["Role"] = relationship(
-    "Role",
-    back_populates="user_roles",
-    )

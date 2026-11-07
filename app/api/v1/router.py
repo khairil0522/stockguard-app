@@ -6,6 +6,8 @@ from app.api.v1.stock_adjustments import router as stock_adjustments_router
 from app.api.v1.booking import router as booking_router
 from app.api.v1.dashboard import router as dashboard_router
 
+from app.api.v1.auth import router as auth_router
+
 router = APIRouter()
 
 router.include_router(products_router)
@@ -13,3 +15,5 @@ router.include_router(stock_adjustments_router)
 router.include_router(booking_router)
 router.include_router(dashboard_router)
 router.include_router(inventory_router)
+
+router.include_router(auth_router)
