@@ -3,13 +3,39 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.dependencies.auth import get_current_user, get_current_user_roles, get_current_user_permissions
 
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, LoginResponse, UserMeResponse
+from app.schemas.auth import LoginRequest, LoginResponse, UserMeResponse, RegisterResponse, RegisterRequest
 from app.models.users import User
-from app.services.auth_service import login
-from app.errors.auth import InvalidUsernamePasswordError
+from app.services.auth_service import login, register
+from app.errors.auth import InvalidUsernamePasswordError, UsernameAlreadyUsedError, EmailAlreadyUsedError, RoleNotFoundError
 
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
+
+@router.post("/register", response_model=RegisterResponse)
+async def register_user(
+    payload: RegisterRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        return await register(db, payload)
+    
+    except UsernameAlreadyUsedError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )
+
+    except EmailAlreadyUsedError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )
+
+    except RoleNotFoundError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        ) 
 
 
 @router.post("/login", response_model=LoginResponse)

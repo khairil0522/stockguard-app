@@ -24,3 +24,4 @@ htmlcov/
 #Testing
 test_async_db.py
 test_model_relationship.py
+app/test_jwt.py
