@@ -40,25 +40,24 @@ async def create_permissions(
     payload: PermissionCreate,
 ) -> PermissionRead:
 
-    async with db.begin():
-
-        existing_permission = await db.scalar(
-            select(Permission).where(
-                Permission.code == payload.code
-            )
+    existing_permission = await db.scalar(
+        select(Permission).where(
+            Permission.code == payload.code
         )
+    )
 
-        if existing_permission:
-            raise PermissionAlreadyError()
+    if existing_permission:
+        raise PermissionAlreadyError()
 
-        permission = Permission(
-            code=payload.code,
-            name=payload.name,
-            description=payload.description,
-        )
+    permission = Permission(
+        code=payload.code,
+        name=payload.name,
+        description=payload.description,
+    )
 
-        db.add(permission)
-        await db.flush()
+    db.add(permission)
+    await db.commit()
+    await db.refresh(permission)
 
     return PermissionRead.model_validate(permission)
 
@@ -69,20 +68,19 @@ async def update_permissions(
     payload: PermissionUpdate,
 ) -> PermissionRead:
 
-    async with db.begin():
-
-        permission = await db.scalar(
-            select(Permission).where(
-                Permission.id == permission_id
-            )
+    permission = await db.scalar(
+        select(Permission).where(
+            Permission.id == permission_id
         )
+    )
 
-        if not permission:
-            raise PermissionNotFoundError()
+    if not permission:
+        raise PermissionNotFoundError()
 
-        permission.name = payload.name
-        permission.description = payload.description
+    permission.name = payload.name
+    permission.description = payload.description
 
-        await db.flush()
+    await db.commit()
+    await db.refresh(permission)
 
     return PermissionRead.model_validate(permission)
