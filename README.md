@@ -53,7 +53,7 @@ Its main objectives are:
 - [x] ORM relationships using SQLAlchemy
 - [x] Initial Alembic migration generated and reviewed
 - [x] UserCustomer Alembic migration applied
-- [ ] User registration
+- [x] User registration
 - [x] User authentication
 - [ ] Role and permission assignment workflows
 - [x] Backend permission enforcement
@@ -187,7 +187,7 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db
 ```
 
-Database I/O operations use `await`, while SQLAlchemy query construction remains synchronous.
+Database I/O operations use `await`, while SQLAlchemy query construction remains synchronous. 
 
 Examples:
 
@@ -205,6 +205,25 @@ inventory = await db.scalar(
     .with_for_update()
 )
 ```
+
+#### Transaction Handling Convention
+
+StockGuard uses explicit transaction handling for service-layer write operations.
+
+For protected CRUD endpoints that use `require_permission(...)`, avoid opening a new transaction with `async with db.begin()` because the authorization dependency may already perform database queries using the same `AsyncSession`.
+
+For simple write operations, use:
+
+```python
+db.add(entity)
+await db.commit()
+await db.refresh(entity)
+
+For read-only operations, no explicit transaction management is required.
+
+async with db.begin() should be reserved for operations that require multiple database changes to succeed or fail atomically as a single transaction.
+
+
 
 ---
 
@@ -297,6 +316,7 @@ StockGuard uses JWT-based authentication and backend-enforced authorization.
 - `GET /api/v1/auth/me` — retrieve the currently authenticated user.
 - `GET /api/v1/auth/roles` — retrieve roles assigned to the authenticated user.
 - `GET /api/v1/auth/permissions` — retrieve permissions available to the authenticated user.
+- `POST /api/v1/auth/register` — register new user for customer role on purpose.
 
 Authentication uses the HTTP Bearer token scheme.
 
@@ -345,6 +365,7 @@ http://localhost:8000/api/v1
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/v1/auth/login` | Authenticate user and obtain JWT access token |
+| POST | `/api/v1/auth/register` | Register new customer |
 | GET | `/api/v1/auth/me` | Get authenticated user information |
 | GET | `/api/v1/auth/roles` | Get authenticated user's roles |
 | GET | `/api/v1/auth/permissions` | Get authenticated user's permissions
@@ -405,6 +426,7 @@ Stock adjustment operations are executed inside database transactions:
 async with db.begin():
     ...
 ```
+> **Transaction convention:** Simple protected CRUD operations use explicit `commit()` and `refresh()` after database writes. `async with db.begin()` is reserved for operations that require an explicit atomic transaction boundary, such as multi-step inventory operations.
 
 The system also validates that:
 
@@ -515,7 +537,7 @@ http://localhost:5173
 - [x] UserCustomer profile model
 - [x] Initial User Management and RBAC migration
 - [x] UserCustomer migration
-- [ ] User registration
+- [x] User registration
 - [x] User authentication
 - [ ] Role and permission management workflows
 - [x] Backend authorization enforcement

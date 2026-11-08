@@ -45,24 +45,25 @@ async def create_roles(
     db: AsyncSession,
     payload: RoleCreate,
 ) -> RoleRead:
-    async with db.begin():
 
-        existing_role = await db.scalar(
-            select(Role).where(Role.name == payload.name)
-        )
+    existing_role = await db.scalar(
+        select(Role).where(Role.name == payload.name)
+    )
 
-        if existing_role:
-            raise RoleAlreadyError()
+    if existing_role:
+        raise RoleAlreadyError()
 
-        role = Role(
-            name=payload.name,
-            description=payload.description,
-            is_active=True,
-            is_system=False,
-        )
+    role = Role(
+        name=payload.name,
+        description=payload.description,
+        is_active=True,
+        is_system=False,
+    )
 
-        db.add(role)
-        await db.flush()
+    db.add(role)
+
+    await db.commit()
+    await db.refresh(role)
 
     return RoleRead.model_validate(role)
 
@@ -73,31 +74,30 @@ async def update_roles(
     role_id: UUID,
 ) -> RoleRead:
 
-    async with db.begin():
+    role = await db.scalar(
+        select(Role).where(Role.id == role_id)
+    )
 
-        role = await db.scalar(
-            select(Role).where(Role.id == role_id)
+    if not role:
+        raise RoleNotFoundError()
+
+    existing_role = await db.scalar(
+        select(Role).where(
+            Role.name == payload.name,
+            Role.id != role_id,
         )
+    )
 
-        if not role:
-            raise RoleNotFoundError()
+    if existing_role:
+        raise RoleAlreadyError()
 
-        existing_role = await db.scalar(
-            select(Role).where(
-                Role.name == payload.name,
-                Role.id != role_id,
-            )
-        )
+    role.name = payload.name
+    role.description = payload.description
 
-        if existing_role:
-            raise RoleAlreadyError()
+    await db.commit()
+    await db.refresh(role)
 
-        role.name = payload.name
-        role.description = payload.description
-
-        await db.flush()
-
-    return RoleRead.model_validate(role)
+    return RoleRead.model_validate(role)    
 
 
 async def restatus_role(
