@@ -22,6 +22,11 @@ class RoleAlreadyError(AppError):
     detail = "Role has been already Used"
     error_code = "ROLE_ALREADY_USED"
 
+class RoleProtectedError(AppError):
+    status_code = status.HTTP_409_CONFLICT
+    detail = "User Protected cannot be deleted"
+    error_code = "USER_PROTECTED"
+
 # Permission Error List
 class PermissionNotFoundError(AppError):
     status_code = status.HTTP_404_NOT_FOUND

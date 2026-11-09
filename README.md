@@ -55,8 +55,13 @@ Its main objectives are:
 - [x] UserCustomer Alembic migration applied
 - [x] User registration
 - [x] User authentication
-- [ ] Role and permission assignment workflows
+- [x] User creation
+- [x] User retrieval
+- [x] User update
+- [x] User soft deactivation
 - [x] Backend permission enforcement
+- [ ] User blocking
+- [ ] Role and permission assignment workflows
 
 ### Data Validation & Integrity
 
@@ -539,8 +544,13 @@ http://localhost:5173
 - [x] UserCustomer migration
 - [x] User registration
 - [x] User authentication
-- [ ] Role and permission management workflows
+- [x] User retrieval
+- [x] User creation
+- [x] User update
+- [ ] User soft deactivation
+- [ ] User blocking
 - [x] Backend authorization enforcement
+- [ ] Role and permission management workflows
 
 ### Reservation & Booking
 
