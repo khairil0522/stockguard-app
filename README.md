@@ -409,6 +409,26 @@ Supported movement types:
 
 Stock adjustments are validated against inventory state to prevent invalid stock operations.
 
+### User Management
+
+| Method | Endpoint | Permission | Description |
+|---|---|---|---|
+| GET | `/users` | `user.read` | Retrieve users |
+| GET | `/users/{user_id}` | `user.read` | Retrieve user details |
+| POST | `/users` | `user.create` | Create user |
+| PATCH | `/users/{user_id}` | `user.update` | Update user profile |
+| PATCH | `/users/{user_id}/role` | `user.assign` | Assign user role |
+| DELETE | `/users/{user_id}` | `user.status` | Soft deactivate user |
+
+### Role Assignment Rules
+
+- `SUPERADMIN` cannot create or assign `SUPERADMIN`.
+- `ADMIN` cannot create or assign `ADMIN`.
+- `ADMIN` cannot create or assign `SUPERADMIN`.
+- `ADMIN` can manage `CUSTOMER` and custom roles.
+- `SUPERADMIN` can manage `ADMIN`, `CUSTOMER`, and custom roles.
+- `SUPERADMIN` is treated as a protected system-level role.
+
 ---
 
 ## 🔐 Data Integrity & Concurrency
@@ -547,7 +567,7 @@ http://localhost:5173
 - [x] User retrieval
 - [x] User creation
 - [x] User update
-- [ ] User soft deactivation
+- [x] User soft deactivation
 - [ ] User blocking
 - [x] Backend authorization enforcement
 - [ ] Role and permission management workflows

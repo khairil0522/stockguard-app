@@ -22,10 +22,20 @@ class RoleAlreadyError(AppError):
     detail = "Role has been already Used"
     error_code = "ROLE_ALREADY_USED"
 
+class RoleAlreadyAssignedError(AppError):
+    status_code = status.HTTP_409_CONFLICT
+    detail = "Role has been already Assigned"
+    error_code = "ROLE_ALREADY_ASSIGNED"
+
 class RoleProtectedError(AppError):
     status_code = status.HTTP_409_CONFLICT
-    detail = "User Protected cannot be deleted"
-    error_code = "USER_PROTECTED"
+    detail = "Role Protected cannot be deleted"
+    error_code = "ROLE_PROTECTED"
+
+class RoleNotAllowDoubleError(AppError):
+    status_code = status.HTTP_403_FORBIDDEN
+    detail = "Role System cannot be duplicated"
+    error_code = "ROLE_DUPLICATED"
 
 # Permission Error List
 class PermissionNotFoundError(AppError):

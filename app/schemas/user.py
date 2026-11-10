@@ -34,3 +34,6 @@ class UserUpdate(BaseModel):
     phone_number: str | None = None
     address: str | None = None
     company_name: str | None = None
+
+class UserRoleUpdate(BaseModel):
+    role_id: UUID

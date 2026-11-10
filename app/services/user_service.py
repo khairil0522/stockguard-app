@@ -4,11 +4,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.users import User
 from app.models.user_roles import UserRole
-from app.models.role import Role
+from app.models.roles import Role
 from app.models.user_customers import UserCustomer
-from app.schemas.user import UserRead, UserDetailRead
+from app.schemas.user import UserRead, UserDetailRead, UserCreate, UserUpdate, UserRoleUpdate
 
-from app.errors.auth import RoleNotFoundError, UserNotFoundError, EmailAlreadyUsedError, UsernameAlreadyUsedError, RoleProtectedError
+from app.errors.auth import (
+    RoleNotFoundError,
+    UserNotFoundError,
+    EmailAlreadyUsedError,
+    UsernameAlreadyUsedError,
+    RoleProtectedError,
+    RoleNotAllowDoubleError,
+    RoleAlreadyAssignedError,
+    PermissionDeniedError
+)
 
 from uuid import UUID
 from app.core.security import hash_password
@@ -131,13 +140,32 @@ async def create_user_one(db: AsyncSession, payload: UserCreate, current_user: U
         raise UsernameAlreadyUsedError()
 
     get_role = await db.execute(
-        select(Role).where(Role.name == "CUSTOMER")
+        select(Role).where(Role.id == payload.role_id)
     )
 
     role = get_role.scalar_one_or_none()
 
     if not role:
         raise RoleNotFoundError()
+
+    get_current_roles = await db.execute(
+        select(Role.name)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == current_user.id)
+    )
+
+    current_roles = set(get_current_roles.scalars().all())
+
+    if "SUPERADMIN" in current_roles:
+        if role.name == "SUPERADMIN":
+            raise PermissionDeniedError()
+
+    elif "ADMIN" in current_roles:
+        if role.name in {"ADMIN", "SUPERADMIN"}:
+            raise PermissionDeniedError()
+
+    else:
+        raise PermissionDeniedError()
 
     set_user = UserCreate(
         username = payload.username,
@@ -169,14 +197,16 @@ async def create_user_one(db: AsyncSession, payload: UserCreate, current_user: U
 
     db.add(user_role)
 
-    user_customer = UserCustomer(
+    if role.name == "CUSTOMER":
+        user_customer = UserCustomer(
         user_id = user.id,
         phone_number = set_user.phone_number,
         address = set_user.address,
         company_name = set_user.company_name
-    )
+        )
 
-    db.add(user_customer)
+        db.add(user_customer)
+
     await db.commit()
 
     role_name = []
@@ -250,6 +280,87 @@ async def update_user_one(db: AsyncSession, payload: UserUpdate, current_user: U
 
     if payload.company_name is not None:
         existing_user.customer_profile.company_name = payload.company_name
+
+    await db.commit()
+    await db.refresh(existing_user)
+
+    get_roles = await db.execute(
+        select(Role.name)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == existing_user.id)
+    )
+
+    roles = get_roles.scalars().all()
+
+    return UserDetailRead(
+        id=existing_user.id,
+        username=existing_user.username,
+        email=existing_user.email,
+        full_name=existing_user.full_name,
+        roles=roles,
+        is_active=existing_user.is_active
+    )
+
+async def update_user_role_one(
+    db: AsyncSession,
+    payload: UserRoleUpdate,
+    current_user: User,
+    user_id: UUID,
+) -> UserDetailRead:
+
+    get_user = await db.execute(
+        select(User).where(User.id == user_id)
+    )
+
+    existing_user = get_user.scalar_one_or_none()
+
+    if not existing_user:
+        raise UserNotFoundError()
+
+    get_role = await db.execute(
+        select(Role).where(Role.id == payload.role_id)
+    )
+
+    role = get_role.scalar_one_or_none()
+
+    if not role:
+        raise RoleNotFoundError()
+
+    get_current_roles = await db.execute(
+        select(Role.name)
+        .join(UserRole, UserRole.role_id == Role.id)
+        .where(UserRole.user_id == current_user.id)
+    )
+
+    current_roles = set(get_current_roles.scalars().all())
+
+    if "SUPERADMIN" in current_roles:
+        if role.name == "SUPERADMIN":
+            raise PermissionDeniedError()
+
+    elif "ADMIN" in current_roles:
+        if role.name in {"ADMIN", "SUPERADMIN"}:
+            raise PermissionDeniedError()
+
+    else:
+        raise PermissionDeniedError()
+
+    get_user_role = await db.execute(
+        select(UserRole).where(
+            UserRole.user_id == existing_user.id
+        )
+    )
+
+    user_role = get_user_role.scalar_one_or_none()
+
+    if not user_role:
+        raise RoleNotFoundError()
+
+    if user_role.role_id == role.id:
+        raise RoleAlreadyAssignedError()
+
+    user_role.role_id = role.id
+    user_role.assigned_by = current_user.id
 
     await db.commit()
     await db.refresh(existing_user)

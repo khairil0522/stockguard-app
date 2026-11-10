@@ -9,6 +9,7 @@ from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.role import router as role_router
 from app.api.v1.permission import router as permission_router
+from app.api.v1.user import router as user_router
 
 router = APIRouter()
 
@@ -21,3 +22,4 @@ router.include_router(inventory_router)
 router.include_router(auth_router)
 router.include_router(role_router)
 router.include_router(permission_router)
+router.include_router(user_router)
