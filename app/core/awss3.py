@@ -1,0 +1,1 @@
+# di sini script untuk integrasi dengan AWS S3 bucket

@@ -60,8 +60,31 @@ Its main objectives are:
 - [x] User update
 - [x] User soft deactivation
 - [x] Backend permission enforcement
+- [x] Role and permission assignment workflows
 - [ ] User blocking
-- [ ] Role and permission assignment workflows
+
+### Role Management
+
+- [x] Role listing
+- [x] Role detail
+- [x] Custom role creation
+- [x] Role update
+- [x] Role activation/deactivation
+- [x] Protected system role handling
+
+### Role-Permission Management
+
+- [x] Retrieve all permissions for a role
+- [x] Show permission assignment status
+- [x] Assign permissions to a role
+- [x] Bulk permission assignment
+- [x] Remove permissions from a role
+- [x] Prevent duplicate role-permission assignments
+- [x] Return `assigned=true/false` state for frontend dual-list UI
+- [x] Role management API
+- [x] User role assignment API
+- [x] Role-permission management API
+- [x] Permission assignment/removal
 
 ### Data Validation & Integrity
 
@@ -375,6 +398,24 @@ http://localhost:8000/api/v1
 | GET | `/api/v1/auth/roles` | Get authenticated user's roles |
 | GET | `/api/v1/auth/permissions` | Get authenticated user's permissions
 
+### Role Management
+
+| Method | Endpoint | Permission | Description |
+|---|---|---|---|
+| GET | `/roles/` | `role.read` | Retrieve roles |
+| GET | `/roles/{role_id}` | `role.read` | Retrieve role |
+| POST | `/roles/` | `role.create` | Create custom role |
+| PATCH | `/roles/{role_id}` | `role.update` | Update role |
+| PATCH | `/roles/{role_id}/status` | `role.status` | Activate/deactivate role |
+
+### Role-Permission Management
+
+| Method | Endpoint | Permission | Description |
+|---|---|---|---|
+| GET | `/roles/{role_id}/permissions` | `permission.manage` | Retrieve permissions and assignment status |
+| POST | `/roles/{role_id}/permissions` | `permission.manage` | Assign permissions |
+| DELETE | `/roles/{role_id}/permissions` | `permission.manage` | Remove permissions |
+
 ### Product Endpoints
 
 | Method | Endpoint | Description |
@@ -445,7 +486,7 @@ select(Inventory).where(
 
 This helps prevent concurrent stock operations from modifying the same inventory record without proper synchronization.
 
-Stock adjustment operations are executed inside database transactions:
+Database transactions are used for stock adjustments and other operations that require atomicity:
 
 ```python
 async with db.begin():
@@ -568,9 +609,13 @@ http://localhost:5173
 - [x] User creation
 - [x] User update
 - [x] User soft deactivation
-- [ ] User blocking
 - [x] Backend authorization enforcement
-- [ ] Role and permission management workflows
+- [x] Role and permission management workflows
+- [x] Role management API
+- [x] User role assignment API
+- [x] Role-permission management API
+- [x] Permission assignment/removal
+- [ ] User blocking 
 
 ### Reservation & Booking
 
@@ -607,13 +652,11 @@ StockGuard is also a practical engineering project focused on:
 
 **Active Development**
 
-StockGuard currently has the core Product Management, Inventory Management, Stock Adjustment, Dashboard, and frontend modules implemented.
+StockGuard currently has the core Product Management, Inventory Management, Stock Adjustment, Dashboard, User Management, Role Management, and RBAC modules implemented.
 
-The User Management and RBAC foundation has also been implemented at the database and ORM level, including user, role, permission, association models, and the `UserCustomer` profile.
+JWT authentication and backend authorization enforcement have been implemented, including user role assignment and role-permission management.
 
-The application has been migrated to asynchronous database access using SQLAlchemy `AsyncSession` and PostgreSQL.
-
-JWT authentication and backend authorization enforcement have been implemented.
+The next development phase is <b>AWS S3</b> object storage integration for product images.
 
 ---
 
