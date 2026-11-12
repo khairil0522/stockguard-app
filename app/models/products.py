@@ -64,6 +64,11 @@ class Product(Base):
         nullable=False,
     )
 
+    image_key: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
+    )
+
     # Relationships
     inventory: Mapped["Inventory | None"] = relationship(
         "Inventory",

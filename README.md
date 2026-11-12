@@ -32,6 +32,14 @@ Its main objectives are:
 - [x] Soft delete products using `is_active`
 - [x] Reactivate inactive products
 
+### Product Image Storage
+
+- [x] Upload product image to private AWS S3 bucket
+- [x] Image validation (JPEG, PNG, WebP, Max size 5MB)
+- [x] Store S3 object key in PostgreSQL
+- [x] Generate temporary presigned URL
+- [x] Delete product image without deleting product
+
 ### Inventory Management
 
 - [x] Automatic inventory initialization when creating a product
@@ -133,6 +141,8 @@ Its main objectives are:
 | Styling | Tailwind CSS |
 | HTTP Client | Axios |
 | API Documentation | Swagger UI |
+| Storage | AWS S3 |
+| AWS SDK | Boto3 |
 
 ---
 
@@ -191,6 +201,30 @@ PostgreSQL
 Response
 ```
 
+### Product Image Request Flow
+
+```
+React
+  ↓
+FastAPI Router
+  ↓
+ProductService
+  ↓
+StorageService
+  ↓
+AWS S3
+```
+
+### Product Image metadata
+
+```
+ProductService
+  ↓
+PostgreSQL
+  ↓
+image_key
+```
+
 ### Backend Responsibilities
 
 | Layer | Responsibility |
@@ -202,6 +236,8 @@ Response
 | Service | Business logic, transactions, and database operations |
 | Model | Database structure and relationships |
 | Database | Persistent data storage |
+| Errors | List of Error when the application catch Exceptions |
+| Storage Service | Handles object storage operations such as upload, delete, and presigned URL generation |
 
 ### Async Database Architecture
 
@@ -267,6 +303,7 @@ Stores product information such as:
 - Description
 - Unit price
 - Active status
+- Image key
 
 Products use soft deactivation through the `is_active` field.
 
@@ -428,6 +465,14 @@ http://localhost:8000/api/v1
 
 Product deactivation is implemented as a soft delete using `is_active`.
 
+### Product Image Endpoints
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/products/{product_id}/image` | Upload/replace product image |
+| GET | `/products/{product_id}/image` | Generate temporary presigned URL |
+| DELETE | `/products/{product_id}/image` | Remove product image |
+
+
 ### Stock Adjustment
 
 | Method | Endpoint | Description |
@@ -516,7 +561,7 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-Configure your environment variables in `.env` according to your database configuration.
+Configure your environment variables in `.env` according to your database configuration and AWS S3 policy.
 
 Run database migrations:
 
@@ -593,6 +638,14 @@ http://localhost:5173
 - [x] Product reactivation frontend
 - [x] Stock adjustment frontend
 
+### Product Image Storage
+
+- [x] Upload product image to private AWS S3 bucket
+- [x] Image validation (JPEG, PNG, WebP, Max size 5MB)
+- [x] Store S3 object key in PostgreSQL
+- [x] Generate temporary presigned URL
+- [x] Delete product image without deleting product
+
 ### User Management & RBAC
 
 - [x] User Management database models
@@ -645,6 +698,8 @@ StockGuard is also a practical engineering project focused on:
 - Role-Based Access Control (RBAC)
 - Backend and frontend integration
 - Scalable application architecture
+- Object storage integration (AWS S3)
+- Secure temporary file access
 
 ---
 
@@ -656,8 +711,8 @@ StockGuard currently has the core Product Management, Inventory Management, Stoc
 
 JWT authentication and backend authorization enforcement have been implemented, including user role assignment and role-permission management.
 
-The next development phase is <b>AWS S3</b> object storage integration for product images.
+AWS S3 product image storage has been implemented, including private bucket storage, image validation, object key persistence, presigned URL access, and product image deletion.
 
 ---
 
-*Built with Python, FastAPI, PostgreSQL, and React.*
+*Built with Python, FastAPI, PostgreSQL, AWS S3, Boto3 and React.*
