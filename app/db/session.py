@@ -25,6 +25,9 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as db:
         yield db
 
+async def get_auth_db() -> AsyncGenerator[AsyncSession, None]:
+    async with AsyncSessionLocal() as db:
+        yield db
 
 # ini merupakan sync bisa jadi dokumentasi untuk belajar
 # from collections.abc import Generator

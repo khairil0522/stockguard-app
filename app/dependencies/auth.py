@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.security import decode_access_token
-from app.db.session import get_db
+from app.db.session import get_db, get_auth_db
 from app.models.users import User
 from app.models.roles import Role
 from app.models.user_roles import UserRole
@@ -23,7 +23,7 @@ bearer_scheme = HTTPBearer()
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_auth_db),
 ) -> User:
 
     try:
@@ -67,7 +67,7 @@ async def get_current_user(
 
 async def get_current_user_roles(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_auth_db),
 ):
     statement = (
         select(User)
@@ -83,7 +83,7 @@ async def get_current_user_roles(
 
 async def get_current_user_permissions(
     current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_auth_db),
 ):
     statement = (
         select(User)

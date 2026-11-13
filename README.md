@@ -104,6 +104,19 @@ Its main objectives are:
 - [x] Transaction handling
 - [x] Row-level locking for concurrent stock adjustments
 
+### Reservation & Booking
+
+- [x] Booking creation
+- [x] Stock reservation during booking
+- [x] Booking item management
+- [x] Booking expiration timestamp
+- [x] Booking confirmation
+- [x] Booking cancellation
+- [x] Booking expiration logic
+- [x] Customer booking ownership filtering
+- [x] Admin booking overview
+- [x] Booking retrieval with items
+
 ### Frontend
 
 - [x] Dashboard
@@ -224,6 +237,31 @@ PostgreSQL
   ↓
 image_key
 ```
+
+### Booking Business Logic
+
+Booking access rules are handled in the service layer rather than the router.
+
+The booking service determines the booking scope based on the authenticated user's role:
+
+```text
+Request
+  ↓
+Booking Router
+  ↓
+BookingService
+  ↓
+Check user roles
+  ├── CUSTOMER
+  │     ↓
+  │   Filter by user_id
+  │
+  └── ADMIN / other authorized roles
+        ↓
+      Retrieve all bookings
+```
+
+The router is responsible for request routing and passing the authenticated user's ID to the service. Business rules remain inside the service layer.
 
 ### Backend Responsibilities
 
@@ -347,6 +385,62 @@ Records inventory changes, including:
 - New stock
 - Available stock
 - Reason for adjustment
+
+### Booking
+
+A `Booking` represents a customer reservation for one or more products.
+
+Each booking contains:
+
+- `booking_code`
+- `booking_status`
+- `user_id`
+- `expired_at`
+- `created_at`
+- `updated_at`
+
+Booking statuses:
+
+```text
+PENDING
+CONFIRMED
+CANCELLED
+EXPIRED
+```
+
+A booking can contain multiple BookingItem records.
+
+Each booking item stores:
+- product_id
+- qty
+- unit_price
+
+The unit_price is stored at booking time to preserve the price used for the transaction.
+
+Booking & Inventory Reservation
+When a booking is created:
+
+Booking
+   ↓
+Lock Inventory Row
+   ↓
+Check Available Stock
+   ↓
+Increase reserved_qty
+   ↓
+Create BookingItem
+
+Available stock is calculated as:
+available_qty = on_hand - reserved_qty
+
+When a booking is confirmed:
+reserved_qty -= qty
+on_hand      -= qty
+
+When a booking is cancelled or expired:
+reserved_qty -= qty
+
+This prevents reserved inventory from being consumed or released incorrectly during the booking lifecycle.
 
 ### User Management & RBAC
 
@@ -495,6 +589,25 @@ Supported movement types:
 
 Stock adjustments are validated against inventory state to prevent invalid stock operations.
 
+### Booking
+
+| Method | Endpoint | Description |
+|---|---|---|
+| POST | `/bookings` | Create a new booking |
+| GET | `/bookings` | Retrieve bookings based on user role |
+| POST | `/bookings/{booking_id}/confirm` | Confirm a pending booking |
+| POST | `/bookings/{booking_id}/cancel` | Cancel a pending booking |
+| POST | `/bookings/{booking_id}/expire` | Expire a pending booking |
+
+Booking behavior:
+
+- `CUSTOMER` can only retrieve their own bookings.
+- `ADMIN` and higher-level roles can retrieve all bookings.
+- Booking creation automatically reserves inventory.
+- Booking confirmation converts reserved stock into consumed stock.
+- Booking cancellation releases reserved stock.
+- Booking expiration releases reserved stock.
+
 ### User Management
 
 | Method | Endpoint | Permission | Description |
@@ -548,6 +661,22 @@ reserved_qty <= on_hand
 ```
 
 For stock decreases, the system prevents the operation when the resulting stock would fall below the reserved quantity.
+
+### Booking Concurrency Control
+
+Booking creation also uses row-level locking on the related inventory record.
+
+```python
+select(Inventory).where(
+    Inventory.product_id == product_id
+).with_for_update()
+```
+
+The inventory row is locked before checking and updating reserved_qty.
+
+This ensures that concurrent booking requests cannot reserve the same available stock incorrectly.
+
+Booking creation and reservation updates are handled atomically so that a failed booking does not leave partial reservation data behind.
 
 ---
 
@@ -672,15 +801,23 @@ http://localhost:5173
 
 ### Reservation & Booking
 
-- [ ] Stock reservation workflow
-- [ ] Booking management
-- [ ] Booking lifecycle management
-- [ ] Customer booking ownership enforcement
+- [x] Stock reservation workflow
+- [x] Booking creation
+- [x] Booking item management
+- [x] Booking confirmation
+- [x] Booking cancellation
+- [x] Booking expiration logic
+- [x] Customer booking ownership enforcement
+- [x] Admin booking overview
+- [x] Booking retrieval with items
+- [ ] Automatic booking expiration scheduler
+- [ ] Booking lifecycle refinement
 
 ### Testing
 
 - [x] Unit testing for stock adjustment logic
 - [x] Validation and error handling tests
+- [ ] Booking integration testing
 - [ ] Automated integration testing
 
 ---
@@ -707,7 +844,9 @@ StockGuard is also a practical engineering project focused on:
 
 **Active Development**
 
-StockGuard currently has the core Product Management, Inventory Management, Stock Adjustment, Dashboard, User Management, Role Management, and RBAC modules implemented.
+StockGuard currently has the core Product Management, Inventory Management, Stock Adjustment, Reservation & Booking, Dashboard, User Management, Role Management, and RBAC modules implemented.
+
+The Booking module supports stock reservation, booking creation, confirmation, cancellation, expiration logic, customer ownership filtering, and role-based booking retrieval.
 
 JWT authentication and backend authorization enforcement have been implemented, including user role assignment and role-permission management.
 
