@@ -12,10 +12,13 @@ from app.schemas.stock_movement import (
 )
 from app.services.stock_adjustment_service import stockadjustment_service
 
+from app.dependencies.auth import get_current_user, require_permission
+
 from app.errors.product import ProductNotFoundError
 from app.errors.stock import InsufficientStockError, StockNotFoundError
 
-from app.models import Inventory
+from app.models.inventory import Inventory
+from app.models.users import User
 
 router = APIRouter(prefix="/stocks", tags=["Stock Adjustments"])
 
@@ -23,14 +26,16 @@ router = APIRouter(prefix="/stocks", tags=["Stock Adjustments"])
     "/products/{product_id}/stock-adjustments",
     response_model=StockAdjustmentRead,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission("stock.adjust"))],
 )
 async def create_stock_adjustment(
     product_id: UUID,
     payload: StockAdjustmentCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     try:
-        movement = await stockadjustment_service.adjust_stock(db, product_id, payload)
+        movement = await stockadjustment_service.adjust_stock(db, product_id, payload, current_user.id)
         inventory = await db.get(Inventory, product_id)
 
         return {

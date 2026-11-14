@@ -6,7 +6,9 @@ from app.db.session import get_db
 from app.schemas.product import ProductCreate, ProductRead, ProductDetailRead, ProductUpdate, ProductStatusUpdate, ProductResponse
 from app.services.product_service import product_service
 from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError, ProductInactiveError
-from app.dependencies.auth import require_permission
+from app.dependencies.auth import require_permission, get_current_user
+
+from app.models.users import User
 
 router = APIRouter(prefix="/products", tags=["Products"])
 ALLOWED_IMAGE_TYPES = {
@@ -26,9 +28,10 @@ MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
 async def create_product(
     payload: ProductCreate,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     try:
-        return await product_service.create(db, payload)
+        return await product_service.create(db, payload, current_user.id)
     except DuplicateSKUError as exc:
         raise HTTPException(
             status_code=exc.status_code,
@@ -74,9 +77,10 @@ async def update_product(
     payload: ProductUpdate,
     product_id : UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user), 
 ):
     try:
-        return await product_service.update(db, product_id, payload)
+        return await product_service.update(db, product_id, payload, current_user.id)
     except ProductNotFoundError as exc :
         raise HTTPException(
             status_code=exc.status_code,
@@ -86,16 +90,17 @@ async def update_product(
 @router.patch(
     "/{product_id}/status",
     response_model=ProductResponse,
-    dependencies=[Depends(require_permission("product.delete"))],
+    dependencies=[Depends(require_permission("product.status"))],
     status_code=status.HTTP_200_OK,
 )
 async def update_product_status(
-    product_id : UUID,  
+    product_id : UUID,
     payload: ProductStatusUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     try:
-        return await product_service.update_status(db, product_id, payload.is_active)
+        return await product_service.update_status(db, product_id, payload.is_active, current_user.id)
     except ProductNotFoundError as exc :
         raise HTTPException(
             status_code=exc.status_code,
@@ -113,11 +118,14 @@ async def update_product_status(
         )
 
 
-@router.post("/{product_id}/image")
+@router.post(
+    "/{product_id}/image",
+    dependencies=[Depends(require_permission("product.create"))],)
 async def upload_product_image(
     product_id: UUID,
     file: UploadFile,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
@@ -138,6 +146,7 @@ async def upload_product_image(
         product_id=product_id,
         file_content=file_content,
         content_type=file.content_type,
+        user_id=current_user.id
     )
 
 
@@ -181,11 +190,13 @@ async def get_product_image(
 async def delete_product_image(
     product_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
         return await product_service.delete_image(
             db=db,
             product_id=product_id,
+            user_id=current_user.id,
         )
 
     except ProductNotFoundError as exc:

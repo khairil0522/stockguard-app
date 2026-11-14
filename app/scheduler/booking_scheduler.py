@@ -7,6 +7,8 @@ from app.services.booking_service import booking_service
 from app.errors.booking import BookingExpirationError, BookingNotFoundError
 from app.errors.inventory import InventoryNotFoundError
 
+from app.services.audit_log_service import AuditLogService
+
 async def process_expired_bookings():
     async with AsyncSessionLocal() as db:
         statement = (
@@ -24,6 +26,17 @@ async def process_expired_bookings():
             async with AsyncSessionLocal() as item_db:
                 try :
                     await booking_service.expired(item_db, booking_id)
+
+                    await AuditLogService.log(
+                        item_db,
+                        actor_type="SYSTEM",
+                        event_type="ACTIVITY",
+                        action="EXPIRE_BOOKING",
+                        entity_type="BOOKING",
+                        entity_id=booking_id,
+                        description=f"Booking {booking_id} expired automatically by scheduler",
+                        severity="INFO",
+                    )
                 except (BookingNotFoundError, InventoryNotFoundError) as e:
                     raise BookingExpirationError(
                         f"Gagal expire booking {booking_id}"

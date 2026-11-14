@@ -79,29 +79,48 @@ class BookingService:
 
         async with db.begin():
             get_booking = await db.scalar(
-                select(Booking).where(Booking.id == id).with_for_update()
+                select(Booking)
+                .where(Booking.id == id)
+                .with_for_update()
             )
 
-            if get_booking is None :
-                raise(BookingNotFoundError())
+            if get_booking is None:
+                raise BookingNotFoundError()
 
             result = await db.scalars(
-                select(BookingItem).where(BookingItem.booking_id == get_booking.id)
+                select(BookingItem)
+                .where(BookingItem.booking_id == get_booking.id)
             )
             get_booking_items = result.all()
 
-            if get_booking.expired_at <= waktu_sekarang and get_booking.booking_status == BookingStatus.PENDING:
+            if (
+                get_booking.expired_at <= waktu_sekarang
+                and get_booking.booking_status == BookingStatus.PENDING
+            ):
                 get_booking.booking_status = BookingStatus.EXPIRED
 
                 for item in get_booking_items:
                     get_inventory = await db.scalar(
-                        select(Inventory).where(Inventory.product_id == item.product_id).with_for_update()
+                        select(Inventory)
+                        .where(Inventory.product_id == item.product_id)
+                        .with_for_update()
                     )
 
-                    if get_inventory is None :
-                        raise(InventoryNotFoundError())
+                    if get_inventory is None:
+                        raise InventoryNotFoundError()
 
                     get_inventory.reserved_qty -= item.qty
+
+                await AuditLogService.log(
+                    db,
+                    actor_type="SYSTEM",
+                    event_type="ACTIVITY",
+                    action="EXPIRE_BOOKING",
+                    entity_type="BOOKING",
+                    entity_id=get_booking.id,
+                    description=f"Booking {get_booking.id} expired automatically",
+                    severity="INFO",
+                )
 
     async def cancellation(self, db: AsyncSession, id:UUID):
         async with db.begin():

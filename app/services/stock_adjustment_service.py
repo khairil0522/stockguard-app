@@ -9,58 +9,104 @@ from app.schemas.stock_movement import StockAdjustmentCreate
 from app.errors.stock import InsufficientStockError, StockNotFoundError
 from app.errors.product import ProductNotFoundError, ProductInactiveError
 
+from app.services.audit_log_service import AuditLogService
+
 class StockAdjustmentService:
     async def adjust_stock(
         self,
         db: AsyncSession,
         product_id: UUID,
         payload: StockAdjustmentCreate,
+        user_id: UUID
     ) -> StockMovement:
-        async with db.begin():
-            inventory = await db.scalar(
-                select(Inventory)
-                .where(Inventory.product_id == product_id)
-                .with_for_update()
+        try:
+            async with db.begin():
+                inventory = await db.scalar(
+                    select(Inventory)
+                    .where(Inventory.product_id == product_id)
+                    .with_for_update()
+                )
+
+                if inventory is None:
+                    raise ProductNotFoundError(product_id)
+
+                product = await db.get(Product, product_id)
+
+                if product is None:
+                    raise ProductNotFoundError()
+
+                if not product.is_active:
+                    raise ProductInactiveError("Produk tidak aktif, tidak dapat melakukan penyesuaian stok")
+
+                previous_on_hand = inventory.on_hand
+
+                if payload.movement_type == "INCREASE":
+                    new_on_hand = previous_on_hand + payload.quantity
+                else:
+                    new_on_hand = previous_on_hand - payload.quantity
+
+                    if new_on_hand < inventory.reserved_qty:
+                        raise InsufficientStockError(
+                            "Pengurangan stok melebihi stok yang tersedia"
+                        )
+
+                inventory.on_hand = new_on_hand
+
+                movement = StockMovement(
+                    product_id=product_id,
+                    movement_type=payload.movement_type,
+                    quantity=payload.quantity,
+                    previous_on_hand=previous_on_hand,
+                    new_on_hand=new_on_hand,
+                    reason=payload.reason,
+                )
+
+                db.add(movement)
+                await db.flush()
+
+                await AuditLogService.log(
+                    db,
+                    actor_type="USER",
+                    user_id=user_id,
+                    event_type="ACTIVITY",
+                    action="ADJUST_STOCK",
+                    entity_type="PRODUCT",
+                    entity_id=product_id,
+                    description=f"Stock adjusted for product {product.sku}",
+                    severity="INFO",
+                    event_metadata={
+                        "movement_type": payload.movement_type,
+                        "quantity": payload.quantity,
+                        "previous_on_hand": previous_on_hand,
+                        "new_on_hand": new_on_hand,
+                        "reserved_qty": inventory.reserved_qty,
+                        "reason": payload.reason,
+                    },
+                )
+
+            return movement
+        
+        except InsufficientStockError:
+            await AuditLogService.log(
+                db,
+                actor_type="USER",
+                user_id=user_id,
+                event_type="SECURITY",
+                action="ADJUST_STOCK_FAILED",
+                entity_type="PRODUCT",
+                entity_id=product_id,
+                description="Stock adjustment failed: insufficient available stock",
+                severity="MEDIUM",
+                event_metadata={
+                    "movement_type": payload.movement_type,
+                    "quantity": payload.quantity,
+                    "reason": payload.reason,
+                },
             )
 
-            if inventory is None:
-                raise ProductNotFoundError(product_id)
+            await db.commit()
 
-            product = await db.get(Product, product_id)
-
-            if product is None:
-                raise ProductNotFoundError()
-
-            if not product.is_active:
-                raise ProductInactiveError("Produk tidak aktif, tidak dapat melakukan penyesuaian stok")
-
-            previous_on_hand = inventory.on_hand
-
-            if payload.movement_type == "INCREASE":
-                new_on_hand = previous_on_hand + payload.quantity
-            else:
-                new_on_hand = previous_on_hand - payload.quantity
-
-                if new_on_hand < inventory.reserved_qty:
-                    raise InsufficientStockError(
-                        "Pengurangan stok melebihi stok yang tersedia"
-                    )
-
-            inventory.on_hand = new_on_hand
-
-            movement = StockMovement(
-                product_id=product_id,
-                movement_type=payload.movement_type,
-                quantity=payload.quantity,
-                previous_on_hand=previous_on_hand,
-                new_on_hand=new_on_hand,
-                reason=payload.reason,
-            )
-
-            db.add(movement)
-            await db.flush()
-
-        return movement
+            raise
 
     async def get_data(self, db: AsyncSession):
         statement = (
