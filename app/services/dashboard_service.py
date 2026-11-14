@@ -5,7 +5,7 @@ from app.models.products import Product
 from app.models.inventory import Inventory
 
 class DashboardService:
-    async def get_dashboard_stats(db: AsyncSession) -> dict:
+    async def get_dashboard_stats(self, db: AsyncSession) -> dict:
         total_products = await db.scalar(
             select(func.count())
             .select_from(Product)

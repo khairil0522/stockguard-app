@@ -8,7 +8,7 @@ from app.errors.inventory import InventoryNotFoundError
 from app.schemas.inventory import InventoryListRead, InventoryDetailRead
 
 class InventoryService:
-    async def get_all(db: AsyncSession):
+    async def get_all(self, db: AsyncSession):
         # Ambil inventory beserta relasi Product
         statement = (
             select(Inventory)
@@ -35,7 +35,7 @@ class InventoryService:
             for inventory in inventory_list
         ]
 
-    async def get_by_id(db: AsyncSession, product_id: UUID):
+    async def get_by_id(self, db: AsyncSession, product_id: UUID):
         # Ambil inventory beserta relasi Product
         statement = (
             select(Inventory)

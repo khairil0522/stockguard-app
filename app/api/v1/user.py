@@ -8,14 +8,7 @@ from app.dependencies.auth import get_current_user,require_permission
 from app.models.users import User
 from app.schemas.user import UserCreate, UserUpdate, UserRead, UserDetailRead, UserRoleUpdate
 from app.dependencies.auth import get_current_user
-from app.services.user_service import (
-    get_all_users,
-    get_detail_user,
-    create_user_one,
-    update_user_one,
-    update_user_role_one,
-    remove_user,
-)
+from app.services.user_service import user_service
 
 from app.errors.auth import (
     EmailAlreadyUsedError,
@@ -41,7 +34,7 @@ async def get_users(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_all_users(db, current_user.id)
+    return await user_service.get_all(db, current_user.id)
 
 
 @router.get(
@@ -53,7 +46,7 @@ async def get_user_detail(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_detail_user(db, user_id)
+    return await user_service.get_detail(db, user_id)
 
 
 @router.post(
@@ -68,7 +61,7 @@ async def create_user(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return await create_user_one(
+        return await user_service.create(
             db,
             payload,
             current_user,
@@ -112,7 +105,7 @@ async def update_user(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return await update_user_one(
+        return await user_service.update(
             db,
             payload,
             current_user,
@@ -151,7 +144,7 @@ async def update_user_role(
     current_user: User = Depends(get_current_user),
 ):
     try:
-        return await update_user_role_one(
+        return await user_service.update_userrole(
             db,
             payload,
             current_user,
@@ -193,7 +186,31 @@ async def remove_user_endpoint(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        await remove_user(db, user_id)
+        await user_service.remove(db, user_id)
+
+    except UserNotFoundError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )
+
+    except RoleProtectedError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )
+
+@router.put(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission("user.status"))],
+)
+async def block_user(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    try:
+        await user_service.block(db, user_id)
 
     except UserNotFoundError as exc:
         raise HTTPException(
