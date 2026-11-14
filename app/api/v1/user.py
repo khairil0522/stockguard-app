@@ -7,6 +7,7 @@ from app.db.session import get_db
 from app.dependencies.auth import get_current_user,require_permission
 from app.models.users import User
 from app.schemas.user import UserCreate, UserUpdate, UserRead, UserDetailRead, UserRoleUpdate
+from app.dependencies.auth import get_current_user
 from app.services.user_service import (
     get_all_users,
     get_detail_user,
@@ -37,9 +38,10 @@ router = APIRouter(
     dependencies=[Depends(require_permission("user.read"))],
 )
 async def get_users(
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_all_users(db)
+    return await get_all_users(db, current_user.id)
 
 
 @router.get(

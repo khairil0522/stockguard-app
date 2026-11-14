@@ -9,11 +9,7 @@ from app.schemas.role_permission import (
     RolePermissionRemove,
     RolePermissionRead,
 )
-from app.services.role_permission_service import (
-    get_permissions_by_role,
-    assign_permissions_to_role,
-    remove_permissions_from_role,
-)
+from app.services.role_permission_service import rolepermission_service
 from app.errors.auth import (
     PermissionNotFoundError,
 )
@@ -33,7 +29,7 @@ async def get_role_permissions(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await get_permissions_by_role(db, role_id)
+        return await rolepermission_service.get_permissions_by_role(db, role_id)
 
     except Exception as exc:
         raise HTTPException(
@@ -53,7 +49,7 @@ async def assign_role_permissions(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await assign_permissions_to_role(
+        return await rolepermission_service.assign_permissions_to_role(
             db,
             role_id,
             payload,
@@ -77,7 +73,7 @@ async def remove_role_permissions(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await remove_permissions_from_role(
+        return await rolepermission_service.remove_permissions_from_role(
             db,
             role_id,
             payload,

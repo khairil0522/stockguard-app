@@ -1,5 +1,6 @@
 #User Management
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.users import User
@@ -22,13 +23,21 @@ from app.errors.auth import (
 from uuid import UUID
 from app.core.security import hash_password
 
+async def get_all_users(db: AsyncSession, user_id: UUID) -> list[UserRead]:
+    statement = (select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user_id))
+    result = await db.scalars(statement)
+    role_names = set(result.all())
 
-
-async def get_all_users(db: AsyncSession) -> list[UserRead]:
     result = []
-    get_now = await db.execute(
-        select(User)
-    )
+    if "SUPERADMIN" in role_names :
+        get_now = await db.execute(select(User))
+    else:
+        get_now = await db.execute(
+                    select(User)
+                    .join(UserRole, UserRole.user_id == User.id).
+                    join(Role, Role.id == UserRole.role_id)
+                    .where(Role.name.not_in(["SUPERADMIN", "ADMIN"]))
+        )
 
     get_users = get_now.scalars().all()
 

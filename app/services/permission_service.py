@@ -7,80 +7,85 @@ from app.errors.auth import (PermissionAlreadyError, PermissionNotFoundError)
 from app.models.permissions import Permission
 from app.schemas.permission import (PermissionCreate,PermissionRead,PermissionUpdate)
 
-
-async def get_all_permissions(db: AsyncSession) -> list[PermissionRead]:
-    result = await db.execute(
-        select(Permission)
-    )
-
-    permissions = result.scalars().all()
-
-    return permissions
-
-
-async def get_permission_by_id(
-    db: AsyncSession,
-    permission_id: UUID,
-) -> PermissionRead:
-
-    permission = await db.scalar(
-        select(Permission).where(
-            Permission.id == permission_id
+class PermissionService:
+    async def get_all(self, db: AsyncSession) -> list[PermissionRead]:
+        result = await db.execute(
+            select(Permission)
         )
-    )
 
-    if not permission:
-        raise PermissionNotFoundError()
+        permissions = result.scalars().all()
 
-    return permission
+        return permissions
 
 
-async def create_permissions(
-    db: AsyncSession,
-    payload: PermissionCreate,
-) -> PermissionRead:
+    async def get_by_id(
+        self,
+        db: AsyncSession,
+        permission_id: UUID,
+    ) -> PermissionRead:
 
-    existing_permission = await db.scalar(
-        select(Permission).where(
-            Permission.code == payload.code
+        permission = await db.scalar(
+            select(Permission).where(
+                Permission.id == permission_id
+            )
         )
-    )
 
-    if existing_permission:
-        raise PermissionAlreadyError()
+        if not permission:
+            raise PermissionNotFoundError()
 
-    permission = Permission(
-        code=payload.code,
-        name=payload.name,
-        description=payload.description,
-    )
-
-    db.add(permission)
-    await db.commit()
-    await db.refresh(permission)
-
-    return PermissionRead.model_validate(permission)
+        return permission
 
 
-async def update_permissions(
-    db: AsyncSession,
-    permission_id: UUID,
-    payload: PermissionUpdate,
-) -> PermissionRead:
+    async def create(
+        self,
+        db: AsyncSession,
+        payload: PermissionCreate,
+    ) -> PermissionRead:
 
-    permission = await db.scalar(
-        select(Permission).where(
-            Permission.id == permission_id
+        existing_permission = await db.scalar(
+            select(Permission).where(
+                Permission.code == payload.code
+            )
         )
-    )
 
-    if not permission:
-        raise PermissionNotFoundError()
+        if existing_permission:
+            raise PermissionAlreadyError()
 
-    permission.name = payload.name
-    permission.description = payload.description
+        permission = Permission(
+            code=payload.code,
+            name=payload.name,
+            description=payload.description,
+        )
 
-    await db.commit()
-    await db.refresh(permission)
+        db.add(permission)
+        await db.commit()
+        await db.refresh(permission)
 
-    return PermissionRead.model_validate(permission)
+        return PermissionRead.model_validate(permission)
+
+
+    async def update(
+        self,
+        db: AsyncSession,
+        permission_id: UUID,
+        payload: PermissionUpdate,
+    ) -> PermissionRead:
+
+        permission = await db.scalar(
+            select(Permission).where(
+                Permission.id == permission_id
+            )
+        )
+
+        if not permission:
+            raise PermissionNotFoundError()
+
+        permission.name = payload.name
+        permission.description = payload.description
+
+        await db.commit()
+        await db.refresh(permission)
+
+        return PermissionRead.model_validate(permission)
+
+permission_service = PermissionService()

@@ -6,11 +6,6 @@ class StockNotFoundError(AppError):
     detail = "Stock not found"
     error_code = "PRODUCT_NOT_FOUND"
 
-class InventoryNotFoundError(AppError):
-    status_code = status.HTTP_404_NOT_FOUND
-    detail = "Inventory not found"
-    error_code = "INVENTORY_NOT_FOUND"
-
 class BookingNotFoundError(AppError):
     status_code = status.HTTP_404_NOT_FOUND
     detail = "Booking not found"
@@ -30,3 +25,8 @@ class BookingCannotBeConfirmedError(AppError):
     status_code = status.HTTP_409_CONFLICT
     detail = "Cannot Confirmed Booking"
     error_code = "CANNOT_CONFIRMED_BOOKING"
+
+class BookingExpirationError(AppError):
+    status_code = status.HTTP_409_CONFLICT
+    detail = "Cannot Change Status to Expire"
+    error_code = "CANNOT_BOOKING_EXPIRATION"

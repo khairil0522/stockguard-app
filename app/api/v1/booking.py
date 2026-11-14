@@ -9,12 +9,13 @@ from app.schemas.booking import BookingCreate
 from app.services.booking_service import booking_service
 from app.errors.booking import (
     StockNotFoundError,
-    InventoryNotFoundError,
     InsufficientQtyError,
     BookingCannotBeCancelledError,
     BookingCannotBeConfirmedError,
     BookingNotFoundError
 )
+from app.errors.product import ProductNotFoundError
+from app.errors.inventory import InventoryNotFoundError
 
 from app.models.users import User
 from app.dependencies.auth import get_current_user, require_permission

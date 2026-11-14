@@ -5,8 +5,19 @@ from app.api.v1.root import router as root_router
 from app.api.v1.router import router as api_v1_router
 
 from app.errors.auth import PermissionDeniedError
+from contextlib import asynccontextmanager
+from app.scheduler.scheduler import start_scheduler
 
-app = FastAPI(title="StockGuard API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    start_scheduler()
+
+    yield
+
+app = FastAPI(
+    title="StockGuard API",
+    lifespan=lifespan
+)
 
 app.add_middleware(
     CORSMiddleware,

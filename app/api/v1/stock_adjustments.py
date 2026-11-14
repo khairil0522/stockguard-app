@@ -10,9 +10,7 @@ from app.schemas.stock_movement import (
     StockAdjustmentHistoryRead,
     StockMovementHistoryByProduct
 )
-from app.services.stock_adjustment_service import (
-    adjust_stock, get_stock_adjustment, get_stock_adjustment_by_product
-)
+from app.services.stock_adjustment_service import stockadjustment_service
 
 from app.errors.product import ProductNotFoundError
 from app.errors.stock import InsufficientStockError, StockNotFoundError
@@ -32,7 +30,7 @@ async def create_stock_adjustment(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        movement = await adjust_stock(db, product_id, payload)
+        movement = await stockadjustment_service.adjust_stock(db, product_id, payload)
         inventory = await db.get(Inventory, product_id)
 
         return {
@@ -69,7 +67,7 @@ async def get_stocks(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await get_stock_adjustment(db)
+        return await stockadjustment_service.get_data(db)
 
     except StockNotFoundError as exc:
         raise HTTPException(
@@ -86,7 +84,7 @@ async def get_stocks_by_product_id(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await get_stock_adjustment_by_product(db, product_id)
+        return await stockadjustment_service.get_by_product(db, product_id)
     except StockNotFoundError as exc:
         raise HTTPException(
             status_code=exc.status_code,

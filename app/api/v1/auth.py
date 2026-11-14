@@ -5,7 +5,7 @@ from app.dependencies.auth import get_current_user, get_current_user_roles, get_
 from app.db.session import get_db
 from app.schemas.auth import LoginRequest, LoginResponse, UserMeResponse, RegisterResponse, RegisterRequest
 from app.models.users import User
-from app.services.auth_service import login, register
+from app.services.auth_service import auth_service
 from app.errors.auth import InvalidUsernamePasswordError, UsernameAlreadyUsedError, EmailAlreadyUsedError, RoleNotFoundError
 
 
@@ -17,7 +17,7 @@ async def register_user(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await register(db, payload)
+        return await auth_service.register(db, payload)
     
     except UsernameAlreadyUsedError as exc:
         raise HTTPException(
@@ -44,7 +44,7 @@ async def login_user(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        access_token = await login(
+        access_token = await auth_service.login(
         db,
         payload.username,
         payload.password,

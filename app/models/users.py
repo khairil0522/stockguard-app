@@ -60,6 +60,12 @@ class User(Base):
         nullable=False,
     )
 
+    is_block: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+    )
+
     # Self-referencing foreign key:
     # Menyimpan ID user yang membuat akun ini.
     created_by: Mapped[uuid.UUID | None] = mapped_column(

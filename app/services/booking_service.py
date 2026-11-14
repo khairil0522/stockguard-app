@@ -6,9 +6,9 @@ from datetime import datetime, timedelta, timezone
 from nanoid import generate
 from uuid import UUID
 from app.errors.product import ProductNotFoundError
+from app.errors.inventory import InventoryNotFoundError
 from app.errors.booking import (
     StockNotFoundError,
-    InventoryNotFoundError,
     InsufficientQtyError,
     BookingCannotBeCancelledError,
     BookingCannotBeConfirmedError,

@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.dashboard import DashboardStatsResponse
-from app.services.dashboard_service import get_dashboard_stats
+from app.services.dashboard_service import dashboard_service
 
 from app.dependencies.auth import require_permission
 
@@ -15,4 +15,4 @@ router = APIRouter(
 @router.get("/stats",response_model=DashboardStatsResponse, 
             dependencies=[Depends(require_permission("dashboard.read"))],)
 async def dashboard_stats(db: AsyncSession = Depends(get_db)):
-    return await get_dashboard_stats(db)
+    return await dashboard_service.get_dashboard_stats(db)

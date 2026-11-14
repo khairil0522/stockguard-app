@@ -12,6 +12,9 @@ from app.models.user_roles import UserRole
 from app.models.role_permissions import RolePermission
 from app.models.user_customers import UserCustomer
 
+# Audit Log
+from app.models.audit_logs import AuditLog
+
 
 __all__ = [
     "Product",
@@ -26,4 +29,5 @@ __all__ = [
     "UserRole",
     "RolePermission",
     "UserCustomer",
+    "AuditLog"
 ]

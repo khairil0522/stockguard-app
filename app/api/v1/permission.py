@@ -11,12 +11,7 @@ from app.schemas.permission import (
     PermissionCreate,
     PermissionUpdate,
 )
-from app.services.permission_service import (
-    get_all_permissions,
-    get_permission_by_id,
-    create_permissions,
-    update_permissions,
-)
+from app.services.permission_service import permission_service
 
 
 router = APIRouter(
@@ -36,7 +31,7 @@ router = APIRouter(
 async def get_permissions(
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_all_permissions(db)
+    return await permission_service.get_all(db)
 
 
 @router.get(
@@ -51,7 +46,7 @@ async def get_permission(
     permission_id: UUID,
     db: AsyncSession = Depends(get_db),
 ):
-    return await get_permission_by_id(
+    return await permission_service.get_by_id(
         db,
         permission_id,
     )
@@ -70,7 +65,7 @@ async def create_permission(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await create_permissions(
+        return await permission_service.create(
             db,
             payload,
         )
@@ -95,7 +90,7 @@ async def update_permission(
     payload: PermissionUpdate,
     db: AsyncSession = Depends(get_db),
 ):
-    return await update_permissions(
+    return await permission_service.update(
         db,
         permission_id,
         payload,

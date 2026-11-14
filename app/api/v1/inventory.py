@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.inventory import InventoryListRead, InventoryDetailRead
-from app.services.inventory_service import get_all_inventory, get_inventory_by_id
+from app.services.inventory_service import inventory_service
 from app.errors.inventory import InventoryNotFoundError
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/inventory", tags=["Inventory"])
 )
 async def get_inventory(db: AsyncSession = Depends(get_db)):
     try:
-        return await get_all_inventory(db)
+        return await inventory_service.get_all(db)
     except InventoryNotFoundError as exc:
         raise HTTPException(
             status_code=exc.status_code,
@@ -34,7 +34,7 @@ async def get_inventory_detail(
     db: AsyncSession = Depends(get_db),
 ):
     try:
-        return await get_inventory_by_id(db, product_id)
+        return await inventory_service.get_by_id(db, product_id)
     except InventoryNotFoundError as exc:
         raise HTTPException(
             status_code=exc.status_code,
