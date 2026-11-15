@@ -53,19 +53,19 @@ class AuditLog(Base):
         nullable=False,
     )
 
-    entity_type: Mapped[str] = mapped_column(
+    entity_type: Mapped[str | None] = mapped_column(
         String(50),
         nullable=True,
     )
 
     entity_id: Mapped[uuid.UUID | None] = mapped_column(
-    UUID(as_uuid=True),
-    nullable=True,
+        UUID(as_uuid=True),
+        nullable=True,
     )
 
     description: Mapped[str | None] = mapped_column(
-    String(255),
-    nullable=False,
+        String(255),
+        nullable=True,
     )
 
     event_metadata: Mapped[dict | None] = mapped_column(

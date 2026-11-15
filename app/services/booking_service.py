@@ -17,6 +17,7 @@ from app.errors.booking import (
 
 from app.models import Booking, BookingItem, BookingStatus, Product, Inventory, Role, UserRole
 from app.schemas.booking import BookingCreate, BookingItemCreate, BookingRead, BookingItemRead
+from app.services.audit_log_service import AuditLogService
 
 class BookingService:
     def get_expiry_time(self):
@@ -71,6 +72,23 @@ class BookingService:
                 db.add(booking_items)
 
                 cek_inventory.reserved_qty += booking_items.qty
+
+            await AuditLogService.log(
+                db,
+                actor_type="USER",
+                user_id=user_id,
+                event_type="ACTIVITY",
+                action="CREATE_BOOKING",
+                entity_type="BOOKING",
+                entity_id=booking.id,
+                description=f"Booking {booking.booking_code} created",
+                severity="INFO",
+                event_metadata={
+                    "booking_code": booking.booking_code,
+                    "item_count": len(payload.items),
+                    "expired_at": booking.expired_at.isoformat(),
+                },
+            )
             
             return booking
 
@@ -122,66 +140,148 @@ class BookingService:
                     severity="INFO",
                 )
 
-    async def cancellation(self, db: AsyncSession, id:UUID):
-        async with db.begin():
-            get_booking = await db.scalar(
-                select(Booking).where(Booking.id == id).with_for_update()
-            )
+    async def cancellation(self, db: AsyncSession, id: UUID, user_id: UUID):
+        failed_booking_code = None
+        failed_user_id = None
 
-            if get_booking is None:
-                raise(BookingNotFoundError())
-            
-            result = await db.scalars(
-                select(BookingItem).where(BookingItem.booking_id == get_booking.id)
-            )
-            get_booking_items = result.all()
+        try:
+            async with db.begin():
+                get_booking = await db.scalar(
+                    select(Booking)
+                    .where(Booking.id == id)
+                    .with_for_update()
+                )
 
-            if get_booking.booking_status == BookingStatus.PENDING:
-                get_booking.booking_status = BookingStatus.CANCELLED
+                if get_booking is None:
+                    raise BookingNotFoundError()
 
-                for item in get_booking_items:
-                    get_inventory = await db.scalar(
-                        select(Inventory).where(Inventory.product_id == item.product_id).with_for_update()
+                result = await db.scalars(
+                    select(BookingItem)
+                    .where(BookingItem.booking_id == get_booking.id)
+                )
+                get_booking_items = result.all()
+
+                if get_booking.booking_status == BookingStatus.PENDING:
+                    get_booking.booking_status = BookingStatus.CANCELLED
+
+                    for item in get_booking_items:
+                        get_inventory = await db.scalar(
+                            select(Inventory)
+                            .where(Inventory.product_id == item.product_id)
+                            .with_for_update()
+                        )
+
+                        if get_inventory is None:
+                            raise InventoryNotFoundError()
+
+                        get_inventory.reserved_qty -= item.qty
+
+                    await AuditLogService.log(
+                        db,
+                        actor_type="USER",
+                        user_id=user_id,
+                        event_type="ACTIVITY",
+                        action="CANCEL_BOOKING",
+                        entity_type="BOOKING",
+                        entity_id=get_booking.id,
+                        description=f"Booking {get_booking.booking_code} cancelled",
+                        severity="INFO",
                     )
 
-                    if get_inventory is None :
-                        raise(InventoryNotFoundError())
+                else:
+                    failed_booking_code = get_booking.booking_code
+                    failed_user_id = get_booking.user_id
 
-                    get_inventory.reserved_qty -= item.qty
-            
-            else:
-                raise(BookingCannotBeCancelledError())
+                    raise BookingCannotBeCancelledError()
 
-    async def confirmed(self, db: AsyncSession, id:UUID):
-        async with db.begin():
-            get_booking = await db.scalar(
-                select(Booking).where(Booking.id == id).with_for_update()
+        except BookingCannotBeCancelledError:
+            await AuditLogService.log(
+                db,
+                actor_type="USER",
+                user_id=user_id,
+                event_type="ACTIVITY",
+                action="CANCEL_BOOKING_FAILED",
+                entity_type="BOOKING",
+                entity_id=id,
+                description=f"Booking {failed_booking_code} cannot be cancelled",
+                severity="MEDIUM",
             )
 
-            if get_booking is None:
-                raise(BookingNotFoundError())
-            
-            result = await db.scalars(
-                select(BookingItem).where(BookingItem.booking_id == get_booking.id)
-            )
-            get_booking_items = result.all()
+            await db.commit()
 
-            if get_booking.booking_status == BookingStatus.PENDING:
-                get_booking.booking_status = BookingStatus.CONFIRMED
+            raise
 
-                for item in get_booking_items:
-                    get_inventory = await db.scalar(
-                        select(Inventory).where(Inventory.product_id == item.product_id).with_for_update()
+    async def confirmed(self, db: AsyncSession, id: UUID, user_id: UUID):
+        failed_booking_code = None
+        failed_user_id = None
+
+        try:
+            async with db.begin():
+                get_booking = await db.scalar(
+                    select(Booking)
+                    .where(Booking.id == id)
+                    .with_for_update()
+                )
+
+                if get_booking is None:
+                    raise BookingNotFoundError()
+
+                result = await db.scalars(
+                    select(BookingItem)
+                    .where(BookingItem.booking_id == get_booking.id)
+                )
+                get_booking_items = result.all()
+
+                if get_booking.booking_status == BookingStatus.PENDING:
+                    get_booking.booking_status = BookingStatus.CONFIRMED
+
+                    for item in get_booking_items:
+                        get_inventory = await db.scalar(
+                            select(Inventory)
+                            .where(Inventory.product_id == item.product_id)
+                            .with_for_update()
+                        )
+
+                        if get_inventory is None:
+                            raise InventoryNotFoundError()
+
+                        get_inventory.on_hand -= item.qty
+                        get_inventory.reserved_qty -= item.qty
+
+                    await AuditLogService.log(
+                        db,
+                        actor_type="USER",
+                        user_id=user_id,
+                        event_type="ACTIVITY",
+                        action="CONFIRM_BOOKING",
+                        entity_type="BOOKING",
+                        entity_id=get_booking.id,
+                        description=f"Booking {get_booking.booking_code} confirmed",
+                        severity="INFO",
                     )
 
-                    if get_inventory is None :
-                        raise(InventoryNotFoundError())
+                else:
+                    failed_booking_code = get_booking.booking_code
+                    failed_user_id = get_booking.user_id
 
-                    get_inventory.on_hand -= item.qty
-                    get_inventory.reserved_qty -= item.qty
-        
-            else :
-                raise(BookingCannotBeConfirmedError())
+                    raise BookingCannotBeConfirmedError()
+
+        except BookingCannotBeConfirmedError:
+            await AuditLogService.log(
+                db,
+                actor_type="USER",
+                user_id=user_id,
+                event_type="ACTIVITY",
+                action="CONFIRM_BOOKING_FAILED",
+                entity_type="BOOKING",
+                entity_id=id,
+                description=f"Booking {failed_booking_code} cannot be confirmed",
+                severity="MEDIUM",
+            )
+
+            await db.commit()
+
+            raise
 
     async def get_all(self, db: AsyncSession, user_id : UUID):
         statement = (select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user_id))

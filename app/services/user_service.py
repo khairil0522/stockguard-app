@@ -22,6 +22,7 @@ from app.errors.auth import (
 
 from uuid import UUID
 from app.core.security import hash_password
+from app.services.rbac_audit import RBACAudit
 
 class UserService:
     async def get_all(self, db: AsyncSession, user_id: UUID) -> list[UserRead]:
@@ -370,8 +371,29 @@ class UserService:
         if user_role.role_id == role.id:
             raise RoleAlreadyAssignedError()
 
+        before = {
+            "role_id": user_role.role_id,
+        }
+
         user_role.role_id = role.id
         user_role.assigned_by = current_user.id
+
+        after = {
+            "role_id": role.id,
+        }
+
+        rbac_audit = RBACAudit(
+            db=db,
+            actor_id=current_user.id,
+            target_id=existing_user.id,
+            target_type="USER",
+        )
+
+        await rbac_audit.assign_role(
+            role_name=role.name,
+            before=before,
+            after=after,
+        )
 
         await db.commit()
         await db.refresh(existing_user)

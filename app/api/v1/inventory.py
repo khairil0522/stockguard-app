@@ -7,6 +7,8 @@ from app.schemas.inventory import InventoryListRead, InventoryDetailRead
 from app.services.inventory_service import inventory_service
 from app.errors.inventory import InventoryNotFoundError
 
+from app.dependencies.auth import require_permission
+
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
 
 
@@ -14,6 +16,9 @@ router = APIRouter(prefix="/inventory", tags=["Inventory"])
     "",
     response_model=list[InventoryListRead],
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(require_permission("inventory.read"))
+    ],
 )
 async def get_inventory(db: AsyncSession = Depends(get_db)):
     try:
@@ -28,6 +33,9 @@ async def get_inventory(db: AsyncSession = Depends(get_db)):
     "/{product_id}",
     response_model=InventoryDetailRead,
     status_code=status.HTTP_200_OK,
+    dependencies=[
+        Depends(require_permission("inventory.read"))
+    ],
 )
 async def get_inventory_detail(
     product_id: UUID,

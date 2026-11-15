@@ -73,9 +73,10 @@ async def create_booking(
 async def confirm_booking(
     booking_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        await booking_service.confirmed(db, booking_id)
+        await booking_service.confirmed(db, booking_id, current_user.id)
         return {
             "message": "Booking confirmed"
         }
@@ -103,9 +104,10 @@ async def confirm_booking(
 async def cancel_booking(
     booking_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        await booking_service.cancellation(db, booking_id)
+        await booking_service.cancellation(db, booking_id, current_user.id)
         return {
             "message": "Booking cancelled"
         }

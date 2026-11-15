@@ -67,7 +67,9 @@ async def create_stock_adjustment(
 @router.get(
     "/",
     response_model=list[StockAdjustmentHistoryRead],
-    status_code=status.HTTP_200_OK)
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_permission("stock.history.read"))],
+)
 async def get_stocks(
     db: AsyncSession = Depends(get_db),
 ):
@@ -83,7 +85,9 @@ async def get_stocks(
 @router.get(
     "/{product_id}",
     response_model=list[StockMovementHistoryByProduct],
-    status_code=status.HTTP_200_OK)
+    status_code=status.HTTP_200_OK,
+    dependencies=[Depends(require_permission("stock.history.read"))],
+)
 async def get_stocks_by_product_id(
     product_id: UUID,
     db: AsyncSession = Depends(get_db),

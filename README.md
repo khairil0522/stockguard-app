@@ -69,6 +69,9 @@ Its main objectives are:
 - [x] User soft deactivation
 - [x] Backend permission enforcement
 - [x] Role and permission assignment workflows
+- [x] RBAC audit logging
+- [x] Role assignment audit trail
+- [x] Role-permission assignment/removal audit trail
 - [ ] User blocking
 
 ### Role Management
@@ -93,6 +96,15 @@ Its main objectives are:
 - [x] User role assignment API
 - [x] Role-permission management API
 - [x] Permission assignment/removal
+
+### Audit Trail
+
+- [x] Record important user and RBAC activities
+- [x] Audit role assignment and revocation
+- [x] Audit permission assignment and removal
+- [x] Support `USER` and `SYSTEM` actors
+- [x] Store before/after state for audited changes
+- [x] Keep audit logging within the same transaction as the business operation
 
 ### Data Validation & Integrity
 
@@ -262,6 +274,22 @@ Check user roles
 ```
 
 The router is responsible for request routing and passing the authenticated user's ID to the service. Business rules remain inside the service layer.
+
+
+### Audit Trail Flow
+
+Business operation
+  ↓
+Service Layer
+  ↓
+Business Data Change
+  ↓
+AuditLog
+  ↓
+Database Commit
+
+Audit logging is handled at the service layer so business operations and their corresponding audit records are committed within the same transaction.
+
 
 ### Backend Responsibilities
 
@@ -464,6 +492,24 @@ The `UserRole` model also records:
 - `assigned_at`: Role assignment timestamp
 
 The current ORM relationships use SQLAlchemy `relationship()` and `back_populates` to support bidirectional object navigation.
+
+### AuditLog
+
+`AuditLog` records important business and security-related activities performed by users or system processes.
+
+Audit records can capture:
+
+- Actor type (`USER` / `SYSTEM`)
+- User ID when applicable
+- Event type
+- Action
+- Target entity
+- Target entity ID
+- Before state
+- After state
+- Severity
+- Event metadata
+- Timestamp
 
 ## Authentication & Authorization
 
@@ -797,7 +843,10 @@ http://localhost:5173
 - [x] User role assignment API
 - [x] Role-permission management API
 - [x] Permission assignment/removal
-- [ ] User blocking 
+- [x] Audit trail foundation
+- [x] RBAC audit logging
+- [ ] Extended audit logging for other business modules
+- [ ] User blocking
 
 ### Reservation & Booking
 
@@ -810,7 +859,7 @@ http://localhost:5173
 - [x] Customer booking ownership enforcement
 - [x] Admin booking overview
 - [x] Booking retrieval with items
-- [ ] Automatic booking expiration scheduler
+- [x] Automatic booking expiration scheduler
 - [ ] Booking lifecycle refinement
 
 ### Testing
@@ -837,6 +886,7 @@ StockGuard is also a practical engineering project focused on:
 - Scalable application architecture
 - Object storage integration (AWS S3)
 - Secure temporary file access
+- Audit trail and business activity tracking
 
 ---
 
@@ -851,6 +901,8 @@ The Booking module supports stock reservation, booking creation, confirmation, c
 JWT authentication and backend authorization enforcement have been implemented, including user role assignment and role-permission management.
 
 AWS S3 product image storage has been implemented, including private bucket storage, image validation, object key persistence, presigned URL access, and product image deletion.
+
+An audit trail has also been implemented for important RBAC activities, including role assignment/revocation and permission assignment/removal, with audit records persisted within the same transaction as the business operation.
 
 ---
 
