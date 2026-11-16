@@ -72,7 +72,7 @@ Its main objectives are:
 - [x] RBAC audit logging
 - [x] Role assignment audit trail
 - [x] Role-permission assignment/removal audit trail
-- [ ] User blocking
+- [x] User blocking
 
 ### Role Management
 
@@ -845,8 +845,8 @@ http://localhost:5173
 - [x] Permission assignment/removal
 - [x] Audit trail foundation
 - [x] RBAC audit logging
+- [x] User blocking
 - [ ] Extended audit logging for other business modules
-- [ ] User blocking
 
 ### Reservation & Booking
 

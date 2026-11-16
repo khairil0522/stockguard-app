@@ -6,11 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Inventory, Product
 from app.schemas.product import ProductCreate, ProductUpdate
-from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError, ProductInactiveError
+from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError, ProductInactiveError, ProductImageNotFoundError
 from app.errors.inventory import InventoryNotFoundError
 
 from app.services.storage_service import storage_service
-from app.services.audit_log_service import AuditLogService
+from app.audit.product_audit import ProductAudit
 
 class ProductService:
     async def create(
@@ -25,21 +25,11 @@ class ProductService:
         )
 
         if existing_product is not None:
-            await AuditLogService.log(
-                db,
-                actor_type="USER",
+            product_audit = ProductAudit(db)
+
+            await product_audit.create_failed(
                 user_id=user_id,
-                event_type="SECURITY",
-                action="CREATE_PRODUCT_FAILED",
-                entity_type="PRODUCT",
-                description=(
-                    f"Failed to create product with SKU {payload.sku}: "
-                    "SKU already exists"
-                ),
-                severity="LOW",
-                event_metadata={
-                    "sku": payload.sku,
-                },
+                sku=payload.sku,
             )
 
             await db.commit()
@@ -70,20 +60,13 @@ class ProductService:
                 db.add(inventory)
                 await db.flush()
 
-                await AuditLogService.log(
-                    db,
-                    actor_type="USER",
+                product_audit = ProductAudit(db)
+
+                await product_audit.create(
                     user_id=user_id,
-                    event_type="ACTIVITY",
-                    action="CREATE_PRODUCT",
-                    entity_type="PRODUCT",
-                    entity_id=product.id,
-                    description=f"Product {product.sku} created",
-                    severity="INFO",
-                    event_metadata={
-                        "sku": product.sku,
-                        "name": product.name,
-                    },
+                    product_id=product.id,
+                    sku=product.sku,
+                    name=product.name,
                 )
 
             return product
@@ -134,18 +117,11 @@ class ProductService:
         product = await db.get(Product, product_id)
 
         if product is None:
-            await AuditLogService.log(
-                db,
-                actor_type="USER",
+            product_audit = ProductAudit(db)
+
+            await product_audit.update_failed(
                 user_id=user_id,
-                event_type="SECURITY",
-                action="UPDATE_PRODUCT_FAILED",
-                entity_type="PRODUCT",
-                description="Failed to update product: product not found",
-                severity="LOW",
-                event_metadata={
-                    "product_id": str(product_id),
-                },
+                product_id=product_id,
             )
 
             await db.commit()
@@ -156,19 +132,13 @@ class ProductService:
         for field, value in update_data.items():
             setattr(product, field, value)
 
-        await AuditLogService.log(
-            db,
-            actor_type="USER",
+        product_audit = ProductAudit(db)
+
+        await product_audit.update(
             user_id=user_id,
-            event_type="ACTIVITY",
-            action="UPDATE_PRODUCT",
-            entity_type="PRODUCT",
-            entity_id=product.id,
-            description=f"Product {product.sku} updated",
-            severity="INFO",
-            event_metadata={
-                "updated_fields": list(update_data.keys()),
-            },
+            product_id=product.id,
+            sku=product.sku,
+            updated_fields=update_data,
         )
 
         await db.commit()
@@ -187,19 +157,12 @@ class ProductService:
         product = await db.get(Product, product_id)
 
         if product is None:
-            await AuditLogService.log(
-                db,
-                actor_type="USER",
+            product_audit = ProductAudit(db)
+
+            await product_audit.update_status_failed(
                 user_id=user_id,
-                event_type="SECURITY",
-                action="UPDATE_PRODUCT_STATUS_FAILED",
-                entity_type="PRODUCT",
-                description="Failed to update product status: product not found",
-                severity="LOW",
-                event_metadata={
-                    "product_id": str(product_id),
-                    "requested_status": is_active,
-                },
+                product_id=product_id,
+                requested_status=is_active,
             )
 
             await db.commit()
@@ -215,21 +178,13 @@ class ProductService:
                 raise InventoryNotFoundError()
 
             if inventory.on_hand > 0 or inventory.reserved_qty > 0:
-                await AuditLogService.log(
-                    db,
-                    actor_type="USER",
+                product_audit = ProductAudit(db)
+
+                await product_audit.deactivate_failed(
                     user_id=user_id,
-                    event_type="SECURITY",
-                    action="DEACTIVATE_PRODUCT_FAILED",
-                    entity_type="PRODUCT",
-                    entity_id=product.id,
-                    description="Failed to deactivate product: product has stock",
-                    severity="LOW",
-                    event_metadata={
-                        "product_id": str(product.id),
-                        "on_hand": inventory.on_hand,
-                        "reserved_qty": inventory.reserved_qty,
-                    },
+                    product_id=product_id,
+                    on_hand=inventory.on_hand,
+                    reserved_qty=inventory.reserved_qty,
                 )
 
                 await db.commit()
@@ -238,27 +193,24 @@ class ProductService:
         previous_status = product.is_active
         product.is_active = is_active
 
-        action = (
-            "ACTIVATE_PRODUCT"
-            if is_active
-            else "DEACTIVATE_PRODUCT"
-        )
+        product_audit = ProductAudit(db)
 
-        await AuditLogService.log(
-            db,
-            actor_type="USER",
-            user_id=user_id,
-            event_type="ACTIVITY",
-            action=action,
-            entity_type="PRODUCT",
-            entity_id=product.id,
-            description=f"Product {product.sku} status changed",
-            severity="INFO",
-            event_metadata={
-                "previous_status": previous_status,
-                "new_status": is_active,
-            },
-        )
+        if is_active:
+            await product_audit.activate(
+                user_id=user_id,
+                product_id=product.id,
+                sku=product.sku,
+                previous_status=previous_status,
+                new_status=product.is_active,
+            )
+        else:
+            await product_audit.deactivate(
+                user_id=user_id,
+                product_id=product.id,
+                sku=product.sku,
+                previous_status=previous_status,
+                new_status=product.is_active,
+            )
 
         await db.commit()
         await db.refresh(product)
@@ -273,7 +225,7 @@ class ProductService:
         if product is None:
             raise ProductNotFoundError()
 
-        object_key = f"products/{product_id}/main.  jpg"
+        object_key = f"products/{product_id}/main.jpg"
 
         storage_service.upload(
             file_content=file_content,
@@ -283,19 +235,13 @@ class ProductService:
 
         product.image_key = object_key
 
-        await AuditLogService.log(
-            db,
-            actor_type="USER",
+        product_audit = ProductAudit(db)
+
+        await product_audit.upload_image(
             user_id=user_id,
-            event_type="ACTIVITY",
-            action="UPLOAD_PRODUCT_IMAGE",
-            entity_type="PRODUCT",
-            entity_id=product.id,
-            description=f"Product image uploaded for {product.sku}",
-            severity="INFO",
-            event_metadata={
-                "content_type": content_type,
-            },
+            product_id=product_id,
+            sku=product.sku,
+            content_type=content_type,
         )
 
         await db.commit()
@@ -343,19 +289,13 @@ class ProductService:
 
         product.image_key = None #image key harus dikosongkan mengingat foto sudah dihapus dari S3
 
-        await AuditLogService.log(
-            db,
-            actor_type="USER",
+        product_audit = ProductAudit(db)
+
+        await product_audit.delete_image(
             user_id=user_id,
-            event_type="ACTIVITY",
-            action="DELETE_PRODUCT_IMAGE",
-            entity_type="PRODUCT",
-            entity_id=product.id,
-            description=f"Product image deleted for {product.sku}",
-            severity="INFO",
-            event_metadata={
-                "image_key": image_key,
-            },
+            product_id=product_id,
+            sku=product.sku,
+            image_key=image_key,
         )
 
         await db.commit()

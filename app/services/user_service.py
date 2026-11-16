@@ -22,7 +22,8 @@ from app.errors.auth import (
 
 from uuid import UUID
 from app.core.security import hash_password
-from app.services.rbac_audit import RBACAudit
+from app.audit.rbac_audit import RBACAudit
+from app.audit.user_audit import UserAudit
 
 class UserService:
     async def get_all(self, db: AsyncSession, user_id: UUID) -> list[UserRead]:
@@ -218,6 +219,15 @@ class UserService:
 
             db.add(user_customer)
 
+        user_audit = UserAudit(db)
+
+        await user_audit.create(
+            actor_id=current_user.id,
+            user_id=user.id,
+            username=user.username,
+            role_name=role.name,
+        )
+
         await db.commit()
 
         role_name = []
@@ -242,6 +252,8 @@ class UserService:
 
         existing_user = get_user.scalar_one_or_none()
 
+        updated_fields = []
+
         if not existing_user:
             raise UserNotFoundError()
 
@@ -259,6 +271,7 @@ class UserService:
                 raise EmailAlreadyUsedError()
 
             existing_user.email = payload.email
+            updated_fields.append("email")
 
         if payload.username is not None:
             get_username = await db.execute(
@@ -274,23 +287,36 @@ class UserService:
                 raise UsernameAlreadyUsedError()
 
             existing_user.username = payload.username
+            updated_fields.append("username")
 
         if payload.full_name is not None:
             existing_user.full_name = payload.full_name
+            updated_fields.append("full_name")
 
         if payload.password is not None:
             existing_user.password_hash = hash_password(
                 payload.password
             )
+            updated_fields.append("password")
 
         if payload.phone_number is not None:
             existing_user.customer_profile.phone_number = payload.phone_number
+            updated_fields.append("phone_number")
 
         if payload.address is not None:
             existing_user.customer_profile.address = payload.address
 
         if payload.company_name is not None:
             existing_user.customer_profile.company_name = payload.company_name
+
+        user_audit = UserAudit(db)
+
+        await user_audit.update(
+            actor_id=current_user.id,
+            user_id=existing_user.id,
+            username=existing_user.username,
+            updated_fields=updated_fields,
+        )
 
         await db.commit()
         await db.refresh(existing_user)
@@ -415,8 +441,7 @@ class UserService:
             is_active=existing_user.is_active
         )
 
-    async def remove(self, db: AsyncSession, user_id: UUID,
-    ) -> User:
+    async def remove(self, db: AsyncSession, user_id: UUID, current_user: User) -> User:
 
         get_user = await db.execute(
             select(User)
@@ -442,16 +467,20 @@ class UserService:
 
         user.is_active = False
 
+        user_audit = UserAudit(db)
+
+        await user_audit.deactivate(
+            actor_id=current_user.id,
+            user_id=user.id,
+            username=user.username,
+        )
+
         await db.commit()
         await db.refresh(user)
 
         return user
 
-    async def block(
-        self,
-        db: AsyncSession,
-        user_id: UUID,
-    ) -> User:
+    async def block(self, db: AsyncSession, user_id: UUID, current_user: User) -> User:
 
         get_user = await db.execute(
             select(User)
@@ -477,10 +506,20 @@ class UserService:
 
         user.is_block = True
 
+        user_audit = UserAudit(db)
+
+        await user_audit.block(
+            actor_id=current_user.id,
+            user_id=user.id,
+            username=user.username,
+        )
+
         await db.commit()
         await db.refresh(user)
 
-        return user
+        return {
+            f"{user.username} telah diblokir."
+        }
 
 
 user_service = UserService()

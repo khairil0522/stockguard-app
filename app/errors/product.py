@@ -20,3 +20,8 @@ class ProductInactiveError(AppError):
     status_code=status.HTTP_400_BAD_REQUEST
     detail="Product is inactive"
     error_code = "PRODUCT_INACTIVE"
+
+class ProductImageNotFoundError(AppError):
+    status_code=status.HTTP_400_BAD_REQUEST
+    detail="Product Image not Found"
+    error_code = "PRODUCT_IMAGE_NOT_FOUND"

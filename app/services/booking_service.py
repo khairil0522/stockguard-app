@@ -17,7 +17,7 @@ from app.errors.booking import (
 
 from app.models import Booking, BookingItem, BookingStatus, Product, Inventory, Role, UserRole
 from app.schemas.booking import BookingCreate, BookingItemCreate, BookingRead, BookingItemRead
-from app.services.audit_log_service import AuditLogService
+from app.audit.booking_audit import BookingAudit
 
 class BookingService:
     def get_expiry_time(self):
@@ -73,21 +73,14 @@ class BookingService:
 
                 cek_inventory.reserved_qty += booking_items.qty
 
-            await AuditLogService.log(
-                db,
-                actor_type="USER",
+            booking_audit = BookingAudit(db)
+
+            await booking_audit.create(
                 user_id=user_id,
-                event_type="ACTIVITY",
-                action="CREATE_BOOKING",
-                entity_type="BOOKING",
-                entity_id=booking.id,
-                description=f"Booking {booking.booking_code} created",
-                severity="INFO",
-                event_metadata={
-                    "booking_code": booking.booking_code,
-                    "item_count": len(payload.items),
-                    "expired_at": booking.expired_at.isoformat(),
-                },
+                booking_id=booking.id,
+                booking_code=booking.booking_code,
+                item_count=len(payload.items),
+                expired_at=booking.expired_at,
             )
             
             return booking
@@ -129,15 +122,10 @@ class BookingService:
 
                     get_inventory.reserved_qty -= item.qty
 
-                await AuditLogService.log(
-                    db,
-                    actor_type="SYSTEM",
-                    event_type="ACTIVITY",
-                    action="EXPIRE_BOOKING",
-                    entity_type="BOOKING",
-                    entity_id=get_booking.id,
-                    description=f"Booking {get_booking.id} expired automatically",
-                    severity="INFO",
+                booking_audit = BookingAudit(db)
+
+                await booking_audit.expire(
+                    booking_id=get_booking.id,
                 )
 
     async def cancellation(self, db: AsyncSession, id: UUID, user_id: UUID):
@@ -176,16 +164,12 @@ class BookingService:
 
                         get_inventory.reserved_qty -= item.qty
 
-                    await AuditLogService.log(
-                        db,
-                        actor_type="USER",
+                    booking_audit = BookingAudit(db)
+
+                    await booking_audit.cancel(
                         user_id=user_id,
-                        event_type="ACTIVITY",
-                        action="CANCEL_BOOKING",
-                        entity_type="BOOKING",
-                        entity_id=get_booking.id,
-                        description=f"Booking {get_booking.booking_code} cancelled",
-                        severity="INFO",
+                        booking_id=get_booking.id,
+                        booking_code=get_booking.booking_code,
                     )
 
                 else:
@@ -195,16 +179,12 @@ class BookingService:
                     raise BookingCannotBeCancelledError()
 
         except BookingCannotBeCancelledError:
-            await AuditLogService.log(
-                db,
-                actor_type="USER",
+            booking_audit = BookingAudit(db)
+
+            await booking_audit.cancel_failed(
                 user_id=user_id,
-                event_type="ACTIVITY",
-                action="CANCEL_BOOKING_FAILED",
-                entity_type="BOOKING",
-                entity_id=id,
-                description=f"Booking {failed_booking_code} cannot be cancelled",
-                severity="MEDIUM",
+                booking_id=id,
+                booking_code=failed_booking_code,
             )
 
             await db.commit()
@@ -248,16 +228,12 @@ class BookingService:
                         get_inventory.on_hand -= item.qty
                         get_inventory.reserved_qty -= item.qty
 
-                    await AuditLogService.log(
-                        db,
-                        actor_type="USER",
+                    booking_audit = BookingAudit(db)
+
+                    await booking_audit.confirm(
                         user_id=user_id,
-                        event_type="ACTIVITY",
-                        action="CONFIRM_BOOKING",
-                        entity_type="BOOKING",
-                        entity_id=get_booking.id,
-                        description=f"Booking {get_booking.booking_code} confirmed",
-                        severity="INFO",
+                        booking_id=get_booking.id,
+                        booking_code=get_booking.booking_code,
                     )
 
                 else:
@@ -267,16 +243,12 @@ class BookingService:
                     raise BookingCannotBeConfirmedError()
 
         except BookingCannotBeConfirmedError:
-            await AuditLogService.log(
-                db,
-                actor_type="USER",
+            booking_audit = BookingAudit(db)
+
+            await booking_audit.confirm_failed(
                 user_id=user_id,
-                event_type="ACTIVITY",
-                action="CONFIRM_BOOKING_FAILED",
-                entity_type="BOOKING",
-                entity_id=id,
-                description=f"Booking {failed_booking_code} cannot be confirmed",
-                severity="MEDIUM",
+                booking_id=id,
+                booking_code=failed_booking_code,
             )
 
             await db.commit()

@@ -9,7 +9,7 @@ from app.models.user_roles import UserRole
 from app.errors.auth import InvalidUsernamePasswordError, UsernameAlreadyUsedError, EmailAlreadyUsedError, RoleNotFoundError
 from app.schemas.auth import RegisterRequest, RegisterResponse
 
-from app.services.audit_log_service import AuditLogService
+from app.audit.auth_audit import AuthAudit
 
 class AuthService:
     async def login(self, db: AsyncSession, username: str, password: str):
@@ -17,36 +17,21 @@ class AuthService:
         user = await db.scalar(statement)
 
         if not user:
-            await AuditLogService.log(
-                db,
-                actor_type="SYSTEM",
-                event_type="SECURITY",
-                action="LOGIN_FAILED",
-                entity_type="USER",
-                description="Login failed: invalid username or password",
-                severity="LOW",
-                event_metadata={
-                    "username": username,
-                },
+            auth_audit = AuthAudit(db)
+
+            await auth_audit.login_failed_system(
+                username=username,
             )
 
             await db.commit()
             raise InvalidUsernamePasswordError()
 
         if not verify_password(password, user.password_hash):
-            await AuditLogService.log(
-                db,
-                actor_type="USER",
+            auth_audit = AuthAudit(db)
+
+            await auth_audit.login_failed_user(
                 user_id=user.id,
-                event_type="SECURITY",
-                action="LOGIN_FAILED",
-                entity_type="USER",
-                entity_id=user.id,
-                description="Login failed: invalid username or password",
-                severity="LOW",
-                event_metadata={
-                    "username": username,
-                },
+                username=username,
             )
 
             await db.commit()
@@ -54,38 +39,52 @@ class AuthService:
 
         access_token = create_access_token(str(user.id))
 
-        await AuditLogService.log(
-            db,
-            actor_type="USER",
+        auth_audit = AuthAudit(db)
+
+        await auth_audit.login_success(
             user_id=user.id,
-            event_type="SECURITY",
-            action="LOGIN_SUCCESS",
-            entity_type="USER",
-            entity_id=user.id,
-            description=f"User {user.username} logged in successfully",
-            severity="INFO",
+            username=user.username,
         )
 
         await db.commit()
 
         return access_token
 
-    async def register(self, db: AsyncSession, payload : RegisterRequest) -> RegisterResponse : #customer
+    async def register(self, db: AsyncSession, payload: RegisterRequest) -> RegisterResponse:
+
+        existing_username = await db.scalar(
+            select(User).where(User.username == payload.username)
+        )
+
+        if existing_username:
+            auth_audit = AuthAudit(db)
+
+            await auth_audit.register_failed(
+                username=payload.username,
+                reason="USERNAME_ALREADY_USED",
+            )
+
+            await db.commit()
+
+            raise UsernameAlreadyUsedError()
+
+        existing_email = await db.scalar(
+            select(User).where(User.email == payload.email)
+        )
+
+        if existing_email:
+            auth_audit = AuthAudit(db)
+
+            await auth_audit.register_failed(
+                username=payload.username,
+                reason="EMAIL_ALREADY_USED",
+            )
+
+            await db.commit()
+
+            raise EmailAlreadyUsedError()
+
         async with db.begin():
-            existing_username = await db.scalar(
-                select(User).where(User.username == payload.username)
-            )
-
-            if existing_username:
-                raise UsernameAlreadyUsedError()
-
-            existing_email = await db.scalar(
-                select(User).where(User.email == payload.email)
-            )
-
-            if existing_email:
-                raise EmailAlreadyUsedError()
-
             registers = User(
                 username=payload.username,
                 email=payload.email,
@@ -105,14 +104,14 @@ class AuthService:
                 raise RoleNotFoundError()
 
             user_role = UserRole(
-                user_id = registers.id,
-                role_id = get_role_id
+                user_id=registers.id,
+                role_id=get_role_id
             )
 
             db.add(user_role)
 
             customers = UserCustomer(
-                user_id = registers.id,
+                user_id=registers.id,
                 phone_number=payload.phone_number,
                 address=payload.address,
                 company_name=payload.company_name,
@@ -120,24 +119,19 @@ class AuthService:
 
             db.add(customers)
 
-            #AuditLog saat berhasil register
-            await AuditLogService.log(
-                db,
-                actor_type="USER",
+            auth_audit = AuthAudit(db)
+
+            await auth_audit.register(
                 user_id=registers.id,
-                event_type="ACTIVITY",
-                action="REGISTER_USER",
-                entity_type="USER",
-                entity_id=registers.id,
-                description=f"User {registers.username} registered",
+                username=registers.username,
             )
 
         get_access_token = create_access_token(str(registers.id))
 
-        return RegisterResponse (
-            access_token = get_access_token,
-            token_type = "Bearer",
-            username = registers.username,
+        return RegisterResponse(
+            access_token=get_access_token,
+            token_type="Bearer",
+            username=registers.username,
         )
 
 auth_service = AuthService()

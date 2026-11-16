@@ -4,10 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.dependencies.auth import get_current_user,require_permission
+from app.dependencies.auth import get_current_user, require_permission
 from app.models.users import User
 from app.schemas.user import UserCreate, UserUpdate, UserRead, UserDetailRead, UserRoleUpdate
-from app.dependencies.auth import get_current_user
 from app.services.user_service import user_service
 
 from app.errors.auth import (
@@ -184,9 +183,14 @@ async def update_user_role(
 async def remove_user_endpoint(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        await user_service.remove(db, user_id)
+        await user_service.remove(
+            db,
+            user_id,
+            current_user,
+        )
 
     except UserNotFoundError as exc:
         raise HTTPException(
@@ -208,9 +212,14 @@ async def remove_user_endpoint(
 async def block_user(
     user_id: UUID,
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     try:
-        await user_service.block(db, user_id)
+        await user_service.block(
+            db,
+            user_id,
+            current_user,
+        )
 
     except UserNotFoundError as exc:
         raise HTTPException(
