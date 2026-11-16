@@ -2,6 +2,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.roles import Role
 from app.models.user_roles import UserRole
@@ -84,6 +85,29 @@ class UserRepository:
                 UserRole.user_id == user_id
             )
         )
+
+    async def get_all_with_roles(self, db: AsyncSession, exclude_roles: list[str] | None = None) -> list[User]:
+
+        statement = (
+            select(User)
+            .options(
+                selectinload(User.user_roles)
+            )
+        )
+
+        if exclude_roles:
+            statement = (
+                statement
+                .join(UserRole, UserRole.user_id == User.id)
+                .join(Role, Role.id == UserRole.role_id)
+                .where(
+                    Role.name.not_in(exclude_roles)
+                )
+            )
+
+        result = await db.execute(statement)
+
+        return result.scalars().unique().all()
 
 
 user_repository = UserRepository()

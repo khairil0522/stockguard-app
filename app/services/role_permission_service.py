@@ -1,11 +1,10 @@
 from uuid import UUID
 
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.errors.auth import PermissionNotFoundError
-from app.models.roles import Role
+from app.repositories.role_permission_repository import role_permission_repository
+from app.repositories.permission_repository import permission_repository
 from app.models.role_permissions import RolePermission
 from app.models.users import User
 from app.models.permissions import Permission
@@ -15,15 +14,7 @@ from app.audit.rbac_audit import RBACAudit
 
 class RolePermissionService:
     async def get_permissions_by_role(self, db: AsyncSession, role_id: UUID) -> list[RolePermissionRead]:
-        result = await db.execute(
-            select(Permission, RolePermission)
-            .outerjoin(RolePermission,
-                (RolePermission.permission_id == Permission.id)
-                & (RolePermission.role_id == role_id),
-            )
-        )
-
-        rows = result.all()
+        rows = await role_permission_repository.get_permissions_by_role(db, role_id)
 
         permission_list = []
 
@@ -41,27 +32,14 @@ class RolePermissionService:
     async def assign_permissions_to_role(self, db: AsyncSession, role_id: UUID, payload: RolePermissionAssign, current_user: User) -> list[RolePermissionRead]:
 
         # 1. Cek permission yang dikirim memang ada di master Permission
-        result = await db.execute(
-            select(Permission).where(
-                Permission.id.in_(payload.permission_ids)
-            )
-        )
-
-        permissions = result.scalars().all()
+        permissions = await permission_repository.get_by_ids(db, payload.permission_ids)
 
         # Pastikan semua permission yang diminta memang tersedia
         if len(permissions) != len(set(payload.permission_ids)):
             raise PermissionNotFoundError()
 
         # 2. Cek permission yang sudah dimiliki oleh role ini
-        result = await db.execute(
-            select(RolePermission).where(
-                RolePermission.role_id == role_id,
-                RolePermission.permission_id.in_(payload.permission_ids),
-            )
-        )
-
-        existing_role_permissions = result.scalars().all()
+        existing_role_permissions = await role_permission_repository.get_by_role_and_permission_ids(db, role_id, payload.permission_ids)
 
         # Ambil ID permission yang sudah ada
         existing_permission_ids = {
@@ -114,14 +92,7 @@ class RolePermissionService:
 
     async def remove_permissions_from_role(self, db: AsyncSession, role_id: UUID, payload: RolePermissionRemove, current_user: User) -> list[RolePermissionRead]:
         # Ambil dari permission yang dikirim
-        result = await db.execute(
-            select(RolePermission).where(
-                RolePermission.permission_id.in_(payload.permission_ids),
-                RolePermission.role_id == role_id,
-            )
-        )
-
-        permissions = result.scalars().all()
+        permissions = await role_permission_repository.get_by_role_and_permission_ids(db, role_id, payload.permission_ids)
 
         existing_permission_ids = {
             role_permission.permission_id
@@ -150,7 +121,7 @@ class RolePermissionService:
             permission_name="ROLE_PERMISSIONS",
             before=before,
             after=after,
-        )            
+        )
 
         await db.commit()
 
