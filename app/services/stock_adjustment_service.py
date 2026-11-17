@@ -4,6 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Inventory, StockMovement, Product
+from app.repositories.stock_movement_repository import stock_movement_repository
 from app.schemas.stock_movement import StockAdjustmentCreate
 
 from app.errors.stock import InsufficientStockError, StockNotFoundError
@@ -12,25 +13,15 @@ from app.errors.product import ProductNotFoundError, ProductInactiveError
 from app.audit.adjustment_audit import AdjustmentAudit
 
 class StockAdjustmentService:
-    async def adjust_stock(
-        self,
-        db: AsyncSession,
-        product_id: UUID,
-        payload: StockAdjustmentCreate,
-        user_id: UUID
-    ) -> StockMovement:
+    async def adjust_stock(self, db: AsyncSession, product_id: UUID, payload: StockAdjustmentCreate, user_id: UUID) -> StockMovement:
         try:
             async with db.begin():
-                inventory = await db.scalar(
-                    select(Inventory)
-                    .where(Inventory.product_id == product_id)
-                    .with_for_update()
-                )
+                inventory = await inventory_repository.get_by_product_id_for_update(db, product_id)
 
                 if inventory is None:
                     raise ProductNotFoundError(product_id)
 
-                product = await db.get(Product, product_id)
+                product = await product_repository.get_by_id(db, product_id)
 
                 if product is None:
                     raise ProductNotFoundError()
@@ -96,18 +87,7 @@ class StockAdjustmentService:
             raise
 
     async def get_data(self, db: AsyncSession):
-        statement = (
-            select(
-                StockMovement,
-                Product.name.label("product_name")
-            )
-            .join(Product, Product.id == StockMovement.product_id)
-            .order_by(StockMovement.created_at.desc())
-            .limit(5)
-        )
-
-        result = await db.execute(statement)
-        get_stocks = result.all()
+        get_stocks = await stock_movement_repository.get_recent_with_product_name(db, limit=5)
 
         if len(get_stocks) == 0:
             raise(StockNotFoundError())
@@ -127,18 +107,7 @@ class StockAdjustmentService:
     ]
 
     async def get_by_product(self, db: AsyncSession, product_id: UUID):
-        statement = (
-            select(
-                        StockMovement,
-                        Product.name.label("product_name")
-                    )
-                    .join(Product, Product.id == StockMovement.product_id)
-                    .where(StockMovement.product_id == product_id)
-                    .order_by(StockMovement.created_at.desc())
-        )
-
-        result = await db.execute(statement)
-        get_stock = result.all()
+        get_stock = await stock_movement_repository.get_by_product_with_product_name(db, product_id)
 
         if not get_stock:
             return []

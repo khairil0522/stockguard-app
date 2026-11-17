@@ -27,22 +27,17 @@ from app.audit.user_audit import UserAudit
 
 class UserService:
     async def get_all(self, db: AsyncSession, user_id: UUID) -> list[UserRead]:
-        statement = (select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user_id))
-        result = await db.scalars(statement)
+        role_names = set(await user_repository.get_role_names(db, user_id))
         role_names = set(result.all())
 
         result = []
-        if "SUPERADMIN" in role_names :
-            get_now = await db.execute(select(User))
+        if "SUPERADMIN" in role_names:
+            get_users = await user_repository.get_all_with_roles(db)
         else:
-            get_now = await db.execute(
-                        select(User)
-                        .join(UserRole, UserRole.user_id == User.id).
-                        join(Role, Role.id == UserRole.role_id)
-                        .where(Role.name.not_in(["SUPERADMIN", "ADMIN"]))
+            get_users = await user_repository.get_all_with_roles(
+                db,
+                exclude_roles=["SUPERADMIN", "ADMIN"],
             )
-
-        get_users = get_now.scalars().all()
 
         if not get_users:
             return []
@@ -50,47 +45,29 @@ class UserService:
         else:
 
             for user in get_users:
-                roles = []
+                roles = [
+                    user_role.role.name
+                    for user_role in user.user_roles
+                    if user_role.role
+                ]
 
-                role_by_user = await db.execute(
-                    select(UserRole).where(user.id == UserRole.user_id)
-                )
-
-                get_role_by_user = role_by_user.scalars().all()
-
-                if not get_role_by_user:
+                if not roles:
                     raise RoleNotFoundError()
-
-                else :
-                    for role_user in get_role_by_user:
-                        get_role = await db.execute(
-                            select(Role.name).where(Role.id == role_user.role_id)
-                        )
-
-                        role = get_role.scalar()
-
-                        if not role:
-                            raise RoleNotFoundError()
-                        
-                        roles.append(role)
 
                 result.append(
                     UserRead(
-                        id = user.id,
-                        username = user.username,
-                        full_name = user.full_name,
-                        roles = roles,
-                        is_active = user.is_active)
+                        id=user.id,
+                        username=user.username,
+                        full_name=user.full_name,
+                        roles=roles,
+                        is_active=user.is_active,
+                    )
                 )
 
             return result
 
     async def get_detail(self, db: AsyncSession, user_id : UUID) -> UserDetailRead:
-        get_now = await db.execute(
-            select(User).where(User.id == user_id)
-        )
-
-        user = get_now.scalar_one_or_none()
+        user = await user_repository.get_by_id(db, user_id)
 
         if not user:
             raise UserNotFoundError()
@@ -133,40 +110,22 @@ class UserService:
             return result
 
     async def create(self, db: AsyncSession, payload: UserCreate, current_user: User) -> UserDetailRead:
-        get_email = await db.execute(
-            select(User.email).where(User.email == payload.email)
-        )
-
-        existing_email = get_email.scalar_one_or_none()
+        existing_email = await user_repository.get_by_email(db, payload.email)
 
         if existing_email:
             raise EmailAlreadyUsedError()
 
-        get_username = await db.execute(
-            select(User.username).where(User.username == payload.username)
-        )
-
-        existing_username = get_username.scalar_one_or_none()
+        existing_username = await user_repository.get_by_username(db, payload.username)
 
         if existing_username:
             raise UsernameAlreadyUsedError()
 
-        get_role = await db.execute(
-            select(Role).where(Role.id == payload.role_id)
-        )
-
-        role = get_role.scalar_one_or_none()
+        role = await role_repository.get_by_id(db, payload.role_id)
 
         if not role:
             raise RoleNotFoundError()
 
-        get_current_roles = await db.execute(
-            select(Role.name)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == current_user.id)
-        )
-
-        current_roles = set(get_current_roles.scalars().all())
+        current_roles = set(await user_repository.get_role_names(db,current_user.id))
 
         if "SUPERADMIN" in current_roles:
             if role.name == "SUPERADMIN":
@@ -246,11 +205,7 @@ class UserService:
 
     async def update(self, db: AsyncSession, payload: UserUpdate, current_user: User, user_id: UUID) -> UserDetailRead:
 
-        get_user = await db.execute(
-            select(User).where(User.id == user_id)
-        )
-
-        existing_user = get_user.scalar_one_or_none()
+        existing_user = await user_repository.get_by_id(db, user_id)
 
         updated_fields = []
 
@@ -258,14 +213,7 @@ class UserService:
             raise UserNotFoundError()
 
         if payload.email is not None:
-            get_email = await db.execute(
-                select(User).where(
-                    User.email == payload.email,
-                    User.id != user_id
-                )
-            )
-
-            email_exist = get_email.scalar_one_or_none()
+            email_exist = await user_repository.get_by_email_excluding_id(db, payload.email, user_id)
 
             if email_exist:
                 raise EmailAlreadyUsedError()
@@ -274,14 +222,7 @@ class UserService:
             updated_fields.append("email")
 
         if payload.username is not None:
-            get_username = await db.execute(
-                select(User).where(
-                    User.username == payload.username,
-                    User.id != user_id
-                )
-            )
-
-            username_exist = get_username.scalar_one_or_none()
+            username_exist = await user_repository.get_by_username_excluding_id(db, payload.username, user_id)
 
             if username_exist:
                 raise UsernameAlreadyUsedError()
@@ -321,13 +262,7 @@ class UserService:
         await db.commit()
         await db.refresh(existing_user)
 
-        get_roles = await db.execute(
-            select(Role.name)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == existing_user.id)
-        )
-
-        roles = get_roles.scalars().all()
+        roles = await user_repository.get_role_names(db, existing_user.id)
 
         return UserDetailRead(
             id=existing_user.id,
@@ -338,39 +273,19 @@ class UserService:
             is_active=existing_user.is_active
         )
 
-    async def update_userrole(
-        self,
-        db: AsyncSession,
-        payload: UserRoleUpdate,
-        current_user: User,
-        user_id: UUID,
-    ) -> UserDetailRead:
+    async def update_userrole(self, db: AsyncSession, payload: UserRoleUpdate, current_user: User, user_id: UUID) -> UserDetailRead:
 
-        get_user = await db.execute(
-            select(User).where(User.id == user_id)
-        )
-
-        existing_user = get_user.scalar_one_or_none()
+        existing_user = await user_repository.get_by_id(db, user_id)
 
         if not existing_user:
             raise UserNotFoundError()
 
-        get_role = await db.execute(
-            select(Role).where(Role.id == payload.role_id)
-        )
-
-        role = get_role.scalar_one_or_none()
+        role = await role_repository.get_by_id(db, payload.role_id)
 
         if not role:
             raise RoleNotFoundError()
 
-        get_current_roles = await db.execute(
-            select(Role.name)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == current_user.id)
-        )
-
-        current_roles = set(get_current_roles.scalars().all())
+        current_roles = set(await user_repository.get_role_names(db, current_user.id))
 
         if "SUPERADMIN" in current_roles:
             if role.name == "SUPERADMIN":
@@ -383,13 +298,7 @@ class UserService:
         else:
             raise PermissionDeniedError()
 
-        get_user_role = await db.execute(
-            select(UserRole).where(
-                UserRole.user_id == existing_user.id
-            )
-        )
-
-        user_role = get_user_role.scalar_one_or_none()
+        user_role = await user_repository.get_user_role(db, existing_user.id)
 
         if not user_role:
             raise RoleNotFoundError()
@@ -424,13 +333,7 @@ class UserService:
         await db.commit()
         await db.refresh(existing_user)
 
-        get_roles = await db.execute(
-            select(Role.name)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == existing_user.id)
-        )
-
-        roles = get_roles.scalars().all()
+        roles = await user_repository.get_role_names(db, existing_user.id)
 
         return UserDetailRead(
             id=existing_user.id,
@@ -443,24 +346,12 @@ class UserService:
 
     async def remove(self, db: AsyncSession, user_id: UUID, current_user: User) -> User:
 
-        get_user = await db.execute(
-            select(User)
-            .where(User.id == user_id)
-            .with_for_update()
-        )
-
-        user = get_user.scalar_one_or_none()
+        user = await user_repository.get_by_id_for_update(db, user_id)
 
         if not user:
             raise UserNotFoundError()
 
-        get_roles = await db.execute(
-            select(Role.name)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == user_id)
-        )
-
-        roles = get_roles.scalars().all()
+        roles = await user_repository.get_role_names(db, user_id)
 
         if "ADMIN" in roles or "SUPERADMIN" in roles:
             raise RoleProtectedError()
@@ -482,24 +373,12 @@ class UserService:
 
     async def block(self, db: AsyncSession, user_id: UUID, current_user: User) -> User:
 
-        get_user = await db.execute(
-            select(User)
-            .where(User.id == user_id)
-            .with_for_update()
-        )
-
-        user = get_user.scalar_one_or_none()
+        user = await user_repository.get_by_id_for_update(db, user_id)
 
         if not user:
             raise UserNotFoundError()
 
-        get_roles = await db.execute(
-            select(Role.name)
-            .join(UserRole, UserRole.role_id == Role.id)
-            .where(UserRole.user_id == user_id)
-        )
-
-        roles = get_roles.scalars().all()
+        roles = await user_repository.get_role_names(db, user_id)
 
         if "ADMIN" in roles or "SUPERADMIN" in roles:
             raise RoleProtectedError()

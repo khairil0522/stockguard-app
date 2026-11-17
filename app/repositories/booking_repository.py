@@ -4,8 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.bookings import Booking
 from app.models.booking_items import BookingItem
+from app.models.bookings import Booking
 
 
 class BookingRepository:
@@ -37,6 +37,24 @@ class BookingRepository:
         )
 
         return result.scalars().all()
+
+
+    async def get_all_with_items(self, db: AsyncSession, user_id: UUID | None = None) -> list[Booking]:
+
+        statement = (
+            select(Booking)
+            .options(selectinload(Booking.items))
+            .order_by(Booking.created_at.desc())
+        )
+
+        if user_id is not None:
+            statement = statement.where(
+                Booking.user_id == user_id
+            )
+
+        result = await db.scalars(statement)
+
+        return result.all()
 
 
 booking_repository = BookingRepository()

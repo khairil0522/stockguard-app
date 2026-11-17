@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.products import Product
-from app.models.stock_movements import StockMovement
+from app.models.stock_movement import StockMovement
 
 
 class StockMovementRepository:

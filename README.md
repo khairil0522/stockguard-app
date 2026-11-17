@@ -175,56 +175,17 @@ Its main objectives are:
 
 StockGuard follows a layered backend architecture with asynchronous database access to separate HTTP handling, business logic, and database operations.
 
-```text
-                         CLIENT
-                           |
-                           v
-                  React + Vite Frontend
-                           |
-                           v
-                     HTTP Request
-                           |
-                           v
-                    FastAPI Application
-                           |
-                           v
-                  API Router Aggregator
-                    /api/v1/router.py
-                           |
-                           v
-                    Feature Router
-                           |
-                           v
-                    Service Layer
-                           |
-                           v
-              SQLAlchemy Async ORM Layer
-                           |
-                           v
-                      PostgreSQL
-```
+![StockGuard Software Architecture](docs/architecture.png)
 
-### Request Flow
+### Booking and Inventory Reservation Flow
 
-```text
-Client
-  ↓
-React + Vite
-  ↓
-HTTP Request
-  ↓
-FastAPI Router
-  ↓
-Feature Router
-  ↓
-Service Layer
-  ↓
-Async SQLAlchemy
-  ↓
-PostgreSQL
-  ↓
-Response
-```
+StockGuard uses database row-level locking with `SELECT FOR UPDATE` to prevent concurrent booking requests from reserving the same available inventory.
+
+![Booking and Inventory Flow](docs/booking-reservation-flow.png)
+
+### Repository Layer Architecture
+
+![Repository Architecture](docs/repository-layer.png)
 
 ### Product Image Request Flow
 
@@ -278,17 +239,9 @@ The router is responsible for request routing and passing the authenticated user
 
 ### Audit Trail Flow
 
-Business operation
-  ↓
-Service Layer
-  ↓
-Business Data Change
-  ↓
-AuditLog
-  ↓
-Database Commit
+![Audit Trail Flow](docs/audit-trail-flow.png)
 
-Audit logging is handled at the service layer so business operations and their corresponding audit records are committed within the same transaction.
+StockGuard records audit events at the Service Layer and persists the audit record together with the corresponding business changes within the same database transaction where applicable.
 
 
 ### Backend Responsibilities
@@ -300,10 +253,42 @@ Audit logging is handled at the service layer so business operations and their c
 | Feature Router | Handles HTTP endpoints and response mapping |
 | Schema | Request validation and response serialization |
 | Service | Business logic, transactions, and database operations |
+| Repository | Encapsulates database queries and data-access operations |
 | Model | Database structure and relationships |
 | Database | Persistent data storage |
 | Errors | List of Error when the application catch Exceptions |
 | Storage Service | Handles object storage operations such as upload, delete, and presigned URL generation |
+
+
+### Repository Layer
+
+The Repository layer encapsulates database query and data-access operations used by the service layer.
+
+The service layer remains responsible for business rules, transaction boundaries, and audit logging.
+
+```text
+Router
+  ↓
+Service
+  ↓
+Repository
+  ↓
+SQLAlchemy
+  ↓
+PostgreSQL
+```
+
+Repositories are organized by domain rather than using a single generic repository for all entities.
+
+Examples include:
+- ProductRepository
+- InventoryRepository
+- BookingRepository
+- UserRepository
+- RoleRepository
+- PermissionRepository
+- StockMovementRepository
+- DashboardRepository
 
 ### Async Database Architecture
 
@@ -844,9 +829,16 @@ http://localhost:5173
 - [x] Role-permission management API
 - [x] Permission assignment/removal
 - [x] Audit trail foundation
+- [x] Authentication audit logging
+- [x] User activity and security audit logging
+- [x] Product audit logging
+- [x] Stock adjustment audit logging
+- [x] Booking audit logging
 - [x] RBAC audit logging
+- [x] Role assignment audit trail
+- [x] Role-permission assignment/removal audit trail
 - [x] User blocking
-- [ ] Extended audit logging for other business modules
+- [ ] Extended audit logging for remaining business modules
 
 ### Reservation & Booking
 
@@ -887,6 +879,8 @@ StockGuard is also a practical engineering project focused on:
 - Object storage integration (AWS S3)
 - Secure temporary file access
 - Audit trail and business activity tracking
+- Repository pattern for database access separation
+- Domain-oriented data access
 
 ---
 
@@ -902,8 +896,9 @@ JWT authentication and backend authorization enforcement have been implemented, 
 
 AWS S3 product image storage has been implemented, including private bucket storage, image validation, object key persistence, presigned URL access, and product image deletion.
 
-An audit trail has also been implemented for important RBAC activities, including role assignment/revocation and permission assignment/removal, with audit records persisted within the same transaction as the business operation.
+An audit trail has been implemented for important authentication, user, product, stock adjustment, booking, and RBAC activities. Audit records are persisted within the same transaction as the corresponding business operation where applicable.
 
+Next Target will apply redis for caching
 ---
 
 *Built with Python, FastAPI, PostgreSQL, AWS S3, Boto3 and React.*

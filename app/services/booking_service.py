@@ -1,36 +1,34 @@
-from sqlalchemy import select, func
-from sqlalchemy.orm import selectinload
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timedelta, timezone
-from nanoid import generate
+from datetime import datetime, timedelta
 from uuid import UUID
-from app.errors.product import ProductNotFoundError
-from app.errors.inventory import InventoryNotFoundError
+
+from nanoid import generate
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.audit.booking_audit import BookingAudit
 from app.errors.booking import (
-    StockNotFoundError,
-    InsufficientQtyError,
     BookingCannotBeCancelledError,
     BookingCannotBeConfirmedError,
-    BookingNotFoundError
+    BookingNotFoundError,
+    InsufficientQtyError,
+    StockNotFoundError,
 )
+from app.errors.inventory import InventoryNotFoundError
+from app.errors.product import ProductNotFoundError
+from app.models import Booking, BookingItem, BookingStatus
+from app.repositories.booking_repository import booking_repository
+from app.repositories.inventory_repository import inventory_repository
+from app.repositories.product_repository import product_repository
+from app.repositories.user_repository import user_repository
+from app.schemas.booking import BookingCreate, BookingItemRead, BookingRead
 
-from app.models import Booking, BookingItem, BookingStatus, Product, Inventory, Role, UserRole
-from app.schemas.booking import BookingCreate, BookingItemCreate, BookingRead, BookingItemRead
-from app.audit.booking_audit import BookingAudit
 
 class BookingService:
     def get_expiry_time(self):
-        waktu_sekarang = datetime.now(timezone.utc)
+        waktu_sekarang = datetime.now(datetime.UTC)
         waktu_kedaluwarsa = waktu_sekarang + timedelta(minutes=15)
         return waktu_kedaluwarsa
 
-    async def create(
-        self,
-        db: AsyncSession,
-        user_id: UUID,
-        payload: BookingCreate,
-        ) -> Booking:
+    async def create(self, db: AsyncSession, user_id: UUID, payload: BookingCreate) -> Booking:
         async with db.begin():
             BOOKING_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
@@ -45,16 +43,12 @@ class BookingService:
             await db.flush()
 
             for item in payload.items:
-                product = await db.scalar(
-                    select(Product).where(Product.id == item.product_id)
-                )
+                product = await product_repository.get_by_id(db, item.product_id)
 
                 if product is None:
                     raise(ProductNotFoundError())
 
-                cek_inventory = await db.scalar(
-                    select(Inventory).where(Inventory.product_id == product.id).with_for_update()
-                )
+                cek_inventory = await inventory_repository.get_by_product_id_for_update(db, item.product_id)
 
                 if cek_inventory is None :
                     raise(StockNotFoundError())
@@ -86,23 +80,15 @@ class BookingService:
             return booking
 
     async def expired(self, db: AsyncSession, id: UUID):
-        waktu_sekarang = datetime.now(timezone.utc)
+        waktu_sekarang = datetime.now(datetime.UTC)
 
         async with db.begin():
-            get_booking = await db.scalar(
-                select(Booking)
-                .where(Booking.id == id)
-                .with_for_update()
-            )
+            get_booking = await booking_repository.get_by_id_for_update(db, id)
 
             if get_booking is None:
                 raise BookingNotFoundError()
 
-            result = await db.scalars(
-                select(BookingItem)
-                .where(BookingItem.booking_id == get_booking.id)
-            )
-            get_booking_items = result.all()
+            get_booking_items = await booking_repository.get_items(db, get_booking.id)
 
             if (
                 get_booking.expired_at <= waktu_sekarang
@@ -111,11 +97,7 @@ class BookingService:
                 get_booking.booking_status = BookingStatus.EXPIRED
 
                 for item in get_booking_items:
-                    get_inventory = await db.scalar(
-                        select(Inventory)
-                        .where(Inventory.product_id == item.product_id)
-                        .with_for_update()
-                    )
+                    get_inventory = await inventory_repository.get_by_product_id_for_update(db, item.product_id)
 
                     if get_inventory is None:
                         raise InventoryNotFoundError()
@@ -134,30 +116,18 @@ class BookingService:
 
         try:
             async with db.begin():
-                get_booking = await db.scalar(
-                    select(Booking)
-                    .where(Booking.id == id)
-                    .with_for_update()
-                )
+                get_booking = await booking_repository.get_by_id_for_update(db, id)
 
                 if get_booking is None:
                     raise BookingNotFoundError()
 
-                result = await db.scalars(
-                    select(BookingItem)
-                    .where(BookingItem.booking_id == get_booking.id)
-                )
-                get_booking_items = result.all()
+                get_booking_items = await booking_repository.get_items(db, get_booking.id)
 
                 if get_booking.booking_status == BookingStatus.PENDING:
                     get_booking.booking_status = BookingStatus.CANCELLED
 
                     for item in get_booking_items:
-                        get_inventory = await db.scalar(
-                            select(Inventory)
-                            .where(Inventory.product_id == item.product_id)
-                            .with_for_update()
-                        )
+                        get_inventory = await inventory_repository.get_by_product_id_for_update(db, item.product_id)
 
                         if get_inventory is None:
                             raise InventoryNotFoundError()
@@ -197,30 +167,18 @@ class BookingService:
 
         try:
             async with db.begin():
-                get_booking = await db.scalar(
-                    select(Booking)
-                    .where(Booking.id == id)
-                    .with_for_update()
-                )
+                get_booking = await booking_repository.get_by_id_for_update(db, id)
 
                 if get_booking is None:
                     raise BookingNotFoundError()
 
-                result = await db.scalars(
-                    select(BookingItem)
-                    .where(BookingItem.booking_id == get_booking.id)
-                )
-                get_booking_items = result.all()
+                get_booking_items = await booking_repository.get_items(db, get_booking.id)
 
                 if get_booking.booking_status == BookingStatus.PENDING:
                     get_booking.booking_status = BookingStatus.CONFIRMED
 
                     for item in get_booking_items:
-                        get_inventory = await db.scalar(
-                            select(Inventory)
-                            .where(Inventory.product_id == item.product_id)
-                            .with_for_update()
-                        )
+                        get_inventory = await inventory_repository.get_by_product_id_for_update(db, item.product_id)
 
                         if get_inventory is None:
                             raise InventoryNotFoundError()
@@ -256,16 +214,12 @@ class BookingService:
             raise
 
     async def get_all(self, db: AsyncSession, user_id : UUID):
-        statement = (select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user_id))
-        result = await db.scalars(statement)
-        role_names = set(result.all())
+        role_names = await user_repository.get_role_names(db, user_id)
 
         if "CUSTOMER" in role_names :
-            statement = select(Booking).where(Booking.user_id == user_id).options(selectinload(Booking.items))
+            bookings = await booking_repository.get_all_with_items(db, user_id=user_id)
         else :
-            statement = select(Booking).options(selectinload(Booking.items))
-        result = await db.scalars(statement)
-        bookings = result.all()
+            bookings = await booking_repository.get_all_with_items(db)
 
         if not bookings:
             return []

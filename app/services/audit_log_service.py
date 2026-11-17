@@ -1,7 +1,9 @@
-from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
 
-from app.models import AuditLog
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.audit_logs import AuditLog
+
 
 class AuditLogService:
     @staticmethod

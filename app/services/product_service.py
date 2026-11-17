@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Inventory, Product
+from app.repositories import product_repository
 from app.schemas.product import ProductCreate, ProductUpdate
 from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError, ProductInactiveError, ProductImageNotFoundError
 from app.errors.inventory import InventoryNotFoundError
@@ -13,16 +14,9 @@ from app.services.storage_service import storage_service
 from app.audit.product_audit import ProductAudit
 
 class ProductService:
-    async def create(
-        self,
-        db: AsyncSession,
-        payload: ProductCreate,
-        user_id: UUID,
-    ) -> Product:
+    async def create(self, db: AsyncSession, payload: ProductCreate, user_id: UUID) -> Product:
 
-        existing_product = await db.scalar(
-            select(Product).where(Product.sku == payload.sku)
-        )
+        existing_product = await product_repository.get_by_sku(db, payload.sku)
 
         if existing_product is not None:
             product_audit = ProductAudit(db)
@@ -87,34 +81,21 @@ class ProductService:
 
 
     async def get_all(self, db: AsyncSession):
-        statement = select(Product).order_by(Product.name)
-        result = await db.scalars(statement)
-        products = result.all()
+        products = await product_repository.get_all(db)
 
         return products
 
 
     async def get_detail(self, db: AsyncSession, product_id : UUID):
-        statement = (
-            select(Product)
-            .options(selectinload(Product.inventory))
-            .where(Product.id == product_id)
-        )
-        product = await db.scalar(statement)
+        product = product_repository.get_by_id_with_inventory(db, product_id)
         if product is None:
             raise ProductNotFoundError()
         
         return product
 
 
-    async def update(
-        self,
-        db: AsyncSession,
-        product_id : UUID,
-        payload : ProductUpdate,
-        user_id : UUID,
-    ):
-        product = await db.get(Product, product_id)
+    async def update(self, db: AsyncSession, product_id : UUID, payload : ProductUpdate, user_id : UUID):
+        product = await product_repository.get_by_id(db, product_id)
 
         if product is None:
             product_audit = ProductAudit(db)
@@ -147,14 +128,8 @@ class ProductService:
         return product
 
 
-    async def update_status(
-        self,
-        db: AsyncSession,
-        product_id: UUID,
-        is_active: bool,
-        user_id: UUID,
-    ):
-        product = await db.get(Product, product_id)
+    async def update_status(self, db: AsyncSession, product_id: UUID, is_active: bool, user_id: UUID):
+        product = await product_repository.get_by_id()
 
         if product is None:
             product_audit = ProductAudit(db)
@@ -169,9 +144,7 @@ class ProductService:
             
             raise ProductNotFoundError()
 
-        inventory = await db.scalar(
-            select(Inventory).where(Inventory.product_id == product_id).with_for_update()
-        )
+        inventory = await inventory_repository.get_by_product_id_for_update()
 
         if not is_active:
             if inventory is None:
@@ -220,7 +193,7 @@ class ProductService:
 
 
     async def upload_image(self, db: AsyncSession, product_id: UUID, file_content: bytes, content_type: str, user_id: UUID):
-        product = await db.get(Product, product_id)
+        product = await product_repository.get_by_id(db, product_id)
 
         if product is None:
             raise ProductNotFoundError()
@@ -251,7 +224,7 @@ class ProductService:
 
 
     async def get_image_url(self, db: AsyncSession, product_id: UUID):
-        product = await db.get(Product, product_id)
+        product = await product_repository.get_by_id(db, product_id)
 
         if product is None: 
             raise ProductNotFoundError()
@@ -264,13 +237,8 @@ class ProductService:
         )
 
 
-    async def delete_image(
-        self,
-        db: AsyncSession,
-        product_id: UUID,
-        user_id: UUID,
-    ):
-        product = await db.get(Product, product_id)
+    async def delete_image(self, db: AsyncSession, product_id: UUID, user_id: UUID):
+        product = product = await product_repository.get_by_id(db, product_id)
 
         if product is None:
             raise ProductNotFoundError()
