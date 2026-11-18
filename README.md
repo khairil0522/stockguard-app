@@ -190,7 +190,7 @@ StockGuard follows a layered backend architecture with asynchronous database acc
 
 StockGuard uses database row-level locking with `SELECT FOR UPDATE` to prevent concurrent booking requests from reserving the same available inventory.
 
-![Booking and Inventory Flow](docs/booking-reservation-flow.png)
+![Booking and Inventory Flow](docs/booking-inventory-flow.png)
 
 ### Repository Layer Architecture
 

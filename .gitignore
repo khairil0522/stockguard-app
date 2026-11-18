@@ -14,7 +14,7 @@ __pycache__
 .gitignore
 
 # Documentation
-docs
+
 
 # Frontend
 frontend
