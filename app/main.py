@@ -1,15 +1,20 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware  #antisipasi supaya tidak CORS
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware #antisipasi supaya tidak CORS
+
 from app.api.v1.root import router as root_router
 from app.api.v1.router import router as api_v1_router
-
+from app.core.redis import redis_client
 from app.errors.auth import PermissionDeniedError
-from contextlib import asynccontextmanager
 from app.scheduler.scheduler import start_scheduler
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    await redis_client.ping()
+
     start_scheduler()
 
     yield

@@ -1,9 +1,11 @@
+import json
 from uuid import UUID
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.product_audit import ProductAudit
+from app.core.redis import redis_client
 from app.errors.inventory import InventoryNotFoundError
 from app.errors.product import (
     DuplicateSKUError,
@@ -15,7 +17,7 @@ from app.errors.product import (
 from app.models import Inventory, Product
 from app.repositories.inventory_repository import inventory_repository
 from app.repositories.product_repository import product_repository
-from app.schemas.product import ProductCreate, ProductUpdate
+from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 from app.services.storage_service import storage_service
 
 
@@ -91,7 +93,24 @@ class ProductService:
 
 
     async def get_all(self, db: AsyncSession):
+        cached_products = await redis_client.get("products:all")
+        
+        if cached_products is not None:
+            print(">>> CACHE HIT")
+            return json.loads(cached_products)
+
+        print(">>> CACHE MISS")
+
         products = await product_repository.get_all(db)
+
+        products_data = [
+            ProductRead.model_validate(product).model_dump(mode="json")
+            for product in products
+        ]
+
+        await redis_client.set("products:all",json.dumps(products_data))
+
+        print(">>> CACHE SET")
 
         return products
 
@@ -133,6 +152,8 @@ class ProductService:
         )
 
         await db.commit()
+        await redis_client.delete("products:all")
+        print(">>> CACHE INVALIDATED")
         await db.refresh(product)
 
         return product

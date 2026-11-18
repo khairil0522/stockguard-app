@@ -1,6 +1,9 @@
-from pydantic import BaseModel, ConfigDict, Field
-from app.schemas.inventory import InventoryRead
 from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.inventory import InventoryRead
+
 
 class ProductCreate(BaseModel):
     sku: str = Field(min_length=1, max_length=50)

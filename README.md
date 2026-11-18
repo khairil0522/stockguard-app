@@ -40,6 +40,13 @@ Its main objectives are:
 - [x] Generate temporary presigned URL
 - [x] Delete product image without deleting product
 
+### Caching
+
+- [x] Redis integration
+- [x] Product list caching using cache-aside strategy
+- [x] Cache hit / miss handling
+- [x] Cache invalidation after product updates
+
 ### Inventory Management
 
 - [x] Automatic inventory initialization when creating a product
@@ -168,6 +175,8 @@ Its main objectives are:
 | API Documentation | Swagger UI |
 | Storage | AWS S3 |
 | AWS SDK | Boto3 |
+| Containerization | Docker, Docker Compose |
+| Cache | Redis | 
 
 ---
 
@@ -210,6 +219,16 @@ PostgreSQL
   ↓
 image_key
 ```
+
+### Product Caching Flow
+
+StockGuard uses Redis as a cache layer for frequently accessed product list data.
+
+![Product Caching Data](docs/caching-data.png)
+
+The product list cache uses the products:all Redis key.
+
+When product data is modified, the cache is invalidated after a successful database commit to prevent stale product data.
 
 ### Booking Business Logic
 
@@ -258,6 +277,7 @@ StockGuard records audit events at the Service Layer and persists the audit reco
 | Database | Persistent data storage |
 | Errors | List of Error when the application catch Exceptions |
 | Storage Service | Handles object storage operations such as upload, delete, and presigned URL generation |
+| Cache Layer | Handles Redis caching and cache invalidation for frequently accessed data |
 
 
 ### Repository Layer
@@ -590,6 +610,17 @@ http://localhost:8000/api/v1
 
 Product deactivation is implemented as a soft delete using `is_active`.
 
+### Product Caching
+```text
+`GET /products` uses Redis caching for the product list.
+
+The cache follows a cache-aside strategy:
+
+- Cache hit returns data directly from Redis.
+- Cache miss retrieves data from PostgreSQL and stores the result in Redis.
+- Product write operations invalidate the `products:all` cache after a successful database commit.
+```
+
 ### Product Image Endpoints
 | Method | Endpoint | Description |
 |---|---|---|
@@ -711,9 +742,54 @@ Booking creation and reservation updates are handled atomically so that a failed
 
 ---
 
+## 🐳 Docker Environment
+
+StockGuard supports a containerized development environment using Docker Compose.
+
+### Services
+
+| Service | Container | Host Port | Container Port |
+|---|---|---:|---:|
+| FastAPI | `stockguard-api` | `8001` | `8000` |
+| PostgreSQL | `stockguard-postgres` | `5433` | `5432` |
+| Redis | `stockguard-redis` | `6379` | `6379` |
+
+### Service Communication
+
+Inside the Docker network, services communicate using their container/service names rather than `localhost`.
+
+![Repository Architecture](docs/docker-env.png)
+
+The host machine accesses the API through:
+
+http://localhost:8001
+
+PostgreSQL remains accessible from the host through port 5433, while Redis uses port 6379.
+
 ## 🖥️ Running the Application
 
 ### Backend
+
+```bash
+docker compose build
+
+docker compose up -d
+
+docker compose ps
+
+docker compose logs -f api
+```
+
+API : http://localhost:8001
+
+Swagger Documentation : http://localhost:8001/docs
+
+Stop the service
+```bash
+docker compose down
+```
+
+Do not use docker compose down -v when persistent PostgreSQL data needs to be preserved.
 
 Install dependencies:
 
@@ -784,6 +860,15 @@ http://localhost:5173
 - [x] SQLAlchemy 2.0 integration
 - [x] Async database session refactor
 - [x] Alembic migration setup
+- [x] Docker containerization
+- [x] Docker Compose development environment
+
+### Caching
+
+- [x] Redis integration
+- [x] Product list cache
+- [x] Cache-aside strategy
+- [x] Cache invalidation
 
 ### Product & Inventory
 
@@ -881,6 +966,7 @@ StockGuard is also a practical engineering project focused on:
 - Audit trail and business activity tracking
 - Repository pattern for database access separation
 - Domain-oriented data access
+- Redis caching and cache invalidation
 
 ---
 
@@ -898,7 +984,11 @@ AWS S3 product image storage has been implemented, including private bucket stor
 
 An audit trail has been implemented for important authentication, user, product, stock adjustment, booking, and RBAC activities. Audit records are persisted within the same transaction as the corresponding business operation where applicable.
 
-Next Target will apply redis for caching
+Redis caching has been implemented for frequently accessed Product data using a cache-aside strategy.
+
+The Product list cache uses the `products:all` Redis key. Cache invalidation is performed after successful Product write operations to prevent stale cached data.
+
+Docker Compose has also been configured to run the FastAPI API, PostgreSQL, and Redis services as a containerized development environment.
 ---
 
-*Built with Python, FastAPI, PostgreSQL, AWS S3, Boto3 and React.*
+*Built with Python, FastAPI, PostgreSQL, AWS S3, Boto3, Docker, Redis and React.*
