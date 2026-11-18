@@ -48,6 +48,7 @@ def upgrade() -> None:
     sa.Column('full_name', sa.String(length=150), nullable=False),
     sa.Column('password_hash', sa.String(length=255), nullable=False),
     sa.Column('is_active', sa.Boolean(), nullable=False),
+    sa.Column('is_block', sa.Boolean(), nullable=False),
     sa.Column('created_by', sa.UUID(), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),

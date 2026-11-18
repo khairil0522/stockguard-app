@@ -1,15 +1,16 @@
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.schemas.inventory import InventoryListRead, InventoryDetailRead
-from app.services.inventory_service import inventory_service
-from app.errors.inventory import InventoryNotFoundError
-
 from app.dependencies.auth import require_permission
+from app.errors.inventory import InventoryNotFoundError
+from app.schemas.inventory import InventoryDetailRead, InventoryListRead
+from app.services.inventory_service import inventory_service
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
+DB_SESSION_DEPENDENCY = Depends(get_db)
 
 
 @router.get(
@@ -20,7 +21,7 @@ router = APIRouter(prefix="/inventory", tags=["Inventory"])
         Depends(require_permission("inventory.read"))
     ],
 )
-async def get_inventory(db: AsyncSession = Depends(get_db)):
+async def get_inventory(db: AsyncSession = DB_SESSION_DEPENDENCY):
     try:
         return await inventory_service.get_all(db)
     except InventoryNotFoundError as exc:
@@ -39,7 +40,7 @@ async def get_inventory(db: AsyncSession = Depends(get_db)):
 )
 async def get_inventory_detail(
     product_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = DB_SESSION_DEPENDENCY,
 ):
     try:
         return await inventory_service.get_by_id(db, product_id)

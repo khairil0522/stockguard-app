@@ -1,10 +1,12 @@
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.repositories.permission_repository import permission_repository
 
-from app.errors.auth import (PermissionAlreadyError, PermissionNotFoundError)
-from app.schemas.permission import (PermissionCreate,PermissionRead,PermissionUpdate)
+from app.errors.auth import PermissionAlreadyError, PermissionNotFoundError
+from app.models.permissions import Permission
+from app.repositories.permission_repository import permission_repository
+from app.schemas.permission import PermissionCreate, PermissionRead, PermissionUpdate
+
 
 class PermissionService:
 

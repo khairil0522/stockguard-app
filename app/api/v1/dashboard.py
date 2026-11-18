@@ -2,17 +2,18 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
+from app.dependencies.auth import require_permission
 from app.schemas.dashboard import DashboardStatsResponse
 from app.services.dashboard_service import dashboard_service
-
-from app.dependencies.auth import require_permission
 
 router = APIRouter(
     prefix="/dashboard",
     tags=["Dashboard"],
 )
 
+DB_SESSION_DEPENDENCY = Depends(get_db)
+
 @router.get("/stats",response_model=DashboardStatsResponse, 
             dependencies=[Depends(require_permission("dashboard.read"))],)
-async def dashboard_stats(db: AsyncSession = Depends(get_db)):
+async def dashboard_stats(db: AsyncSession = DB_SESSION_DEPENDENCY):
     return await dashboard_service.get_dashboard_stats(db)

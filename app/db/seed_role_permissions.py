@@ -2,13 +2,11 @@ import asyncio
 import selectors
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import AsyncSessionLocal
-from app.models.roles import Role
 from app.models.permissions import Permission
 from app.models.role_permissions import RolePermission
-
+from app.models.roles import Role
 
 ROLE_PERMISSIONS = {
     "SUPERADMIN": "*",
@@ -34,6 +32,7 @@ ROLE_PERMISSIONS = {
         "user.role.assign",
         "role.read",
         "dashboard.read",
+        "auditlog.read",
     ],
 
     "STAFF": [

@@ -1,11 +1,12 @@
-from sqlalchemy import select
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
+
+from uuid import UUID
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories.inventory_repository import inventory_repository
 from app.errors.inventory import InventoryNotFoundError
-from app.schemas.inventory import InventoryListRead, InventoryDetailRead
+from app.repositories.inventory_repository import inventory_repository
+from app.schemas.inventory import InventoryDetailRead, InventoryListRead
+
 
 class InventoryService:
     async def get_all(self, db: AsyncSession):

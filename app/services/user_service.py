@@ -1,34 +1,39 @@
 #User Management
+from uuid import UUID
+
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.users import User
-from app.models.user_roles import UserRole
-from app.models.roles import Role
-from app.models.user_customers import UserCustomer
-from app.schemas.user import UserRead, UserDetailRead, UserCreate, UserUpdate, UserRoleUpdate
-
-from app.errors.auth import (
-    RoleNotFoundError,
-    UserNotFoundError,
-    EmailAlreadyUsedError,
-    UsernameAlreadyUsedError,
-    RoleProtectedError,
-    RoleNotAllowDoubleError,
-    RoleAlreadyAssignedError,
-    PermissionDeniedError
-)
-
-from uuid import UUID
-from app.core.security import hash_password
 from app.audit.rbac_audit import RBACAudit
 from app.audit.user_audit import UserAudit
+from app.core.security import hash_password
+from app.errors.auth import (
+    EmailAlreadyUsedError,
+    PermissionDeniedError,
+    RoleAlreadyAssignedError,
+    RoleNotFoundError,
+    RoleProtectedError,
+    UsernameAlreadyUsedError,
+    UserNotFoundError,
+)
+from app.models.roles import Role
+from app.models.user_customers import UserCustomer
+from app.models.user_roles import UserRole
+from app.models.users import User
+from app.repositories.role_repository import role_repository
+from app.repositories.user_repository import user_repository
+from app.schemas.user import (
+    UserCreate,
+    UserDetailRead,
+    UserRead,
+    UserRoleUpdate,
+    UserUpdate,
+)
+
 
 class UserService:
     async def get_all(self, db: AsyncSession, user_id: UUID) -> list[UserRead]:
         role_names = set(await user_repository.get_role_names(db, user_id))
-        role_names = set(result.all())
 
         result = []
         if "SUPERADMIN" in role_names:
@@ -307,14 +312,14 @@ class UserService:
             raise RoleAlreadyAssignedError()
 
         before = {
-            "role_id": user_role.role_id,
+            "role_id": str(user_role.role_id),
         }
 
         user_role.role_id = role.id
         user_role.assigned_by = current_user.id
 
         after = {
-            "role_id": role.id,
+            "role_id": str(role.id),
         }
 
         rbac_audit = RBACAudit(
@@ -369,7 +374,10 @@ class UserService:
         await db.commit()
         await db.refresh(user)
 
-        return user
+        return {
+            "user" : user,
+            "message": f"{user.username} telah dinonaktifkan."
+        }
 
     async def block(self, db: AsyncSession, user_id: UUID, current_user: User) -> User:
 
@@ -397,7 +405,68 @@ class UserService:
         await db.refresh(user)
 
         return {
-            f"{user.username} telah diblokir."
+            "user" : user,
+            "message" : f"{user.username} telah diblokir."
+        }
+
+    async def restore(self, db: AsyncSession, user_id: UUID, current_user: User) -> User:
+
+        user = await user_repository.get_by_id_for_update(db, user_id)
+
+        if not user:
+            raise UserNotFoundError()
+
+        roles = await user_repository.get_role_names(db, user_id)
+
+        if "ADMIN" in roles or "SUPERADMIN" in roles:
+            raise RoleProtectedError()
+
+        user.is_active = True
+
+        user_audit = UserAudit(db)
+
+        await user_audit.reactivate(
+            actor_id=current_user.id,
+            user_id=user.id,
+            username=user.username,
+        )
+
+        await db.commit()
+        await db.refresh(user)
+
+        return {
+            "user" : user,
+            "message": f"{user.username} telah diaktifkan kembali."
+        }
+
+    async def unblock(self, db: AsyncSession, user_id: UUID, current_user: User) -> User:
+
+        user = await user_repository.get_by_id_for_update(db, user_id)
+
+        if not user:
+            raise UserNotFoundError()
+
+        roles = await user_repository.get_role_names(db, user_id)
+
+        if "ADMIN" in roles or "SUPERADMIN" in roles:
+            raise RoleProtectedError()
+
+        user.is_block = False
+
+        user_audit = UserAudit(db)
+
+        await user_audit.unblock(
+            actor_id=current_user.id,
+            user_id=user.id,
+            username=user.username,
+        )
+
+        await db.commit()
+        await db.refresh(user)
+
+        return {
+            "user" : user,
+            "message" : f"{user.username} telah dibuka blokir."
         }
 
 

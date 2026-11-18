@@ -1,13 +1,18 @@
+import logging
 from datetime import datetime, timezone
+
 from sqlalchemy import select
+from sqlalchemy.exc import OperationalError
 
 from app.db.session import AsyncSessionLocal
-from app.models import Booking, BookingStatus
-from app.services.booking_service import booking_service
-from app.errors.booking import BookingExpirationError, BookingNotFoundError
+from app.errors.booking import BookingNotFoundError
 from app.errors.inventory import InventoryNotFoundError
-
+from app.models import Booking, BookingStatus
 from app.services.audit_log_service import AuditLogService
+from app.services.booking_service import booking_service
+
+logger = logging.getLogger(__name__)
+
 
 async def process_expired_bookings():
     async with AsyncSessionLocal() as db:
@@ -15,16 +20,24 @@ async def process_expired_bookings():
             select(Booking.id)
             .where(
                 Booking.booking_status == BookingStatus.PENDING,
-                Booking.expired_at <= datetime.now(timezone.utc),
+                Booking.expired_at <= datetime.now(timezone.utc),  # noqa: UP017
             )
         )
 
-        result = await db.scalars(statement)
+        try:
+            result = await db.scalars(statement)
+
+        except OperationalError as exc:
+            logger.error(
+                "Database connection error while processing expired bookings: %s",
+                exc,
+            )
+            return
         booking_ids = result.all()
 
         for booking_id in booking_ids:
             async with AsyncSessionLocal() as item_db:
-                try :
+                try:
                     await booking_service.expired(item_db, booking_id)
 
                     await AuditLogService.log(
@@ -38,6 +51,9 @@ async def process_expired_bookings():
                         severity="INFO",
                     )
                 except (BookingNotFoundError, InventoryNotFoundError) as e:
-                    raise BookingExpirationError(
-                        f"Gagal expire booking {booking_id}"
-                    ) from e
+                    logger.error(
+                        "Gagal expire booking %s: %s",
+                        booking_id,
+                        e,
+                    )
+                    continue

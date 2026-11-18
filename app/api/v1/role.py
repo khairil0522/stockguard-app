@@ -1,11 +1,13 @@
+from typing import Annotated
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies.auth import get_current_user, get_current_user_roles, get_current_user_permissions, require_permission
-from app.errors.auth import RoleAlreadyError
 
 from app.db.session import get_db
-from app.schemas.role import RoleRead, RoleCreate, RoleUpdate
+from app.dependencies.auth import require_permission
+from app.errors.auth import RoleAlreadyError, RoleNotFoundError, RoleProtectedError
+from app.schemas.role import RoleCreate, RoleRead, RoleUpdate
 from app.services.role_service import role_service
 
 router = APIRouter(prefix="/roles", tags=["Roles"])
@@ -16,7 +18,7 @@ router = APIRouter(prefix="/roles", tags=["Roles"])
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_permission("role.read"))],
 )
-async def get_roles(db: AsyncSession = Depends(get_db)):
+async def get_roles(db: Annotated[AsyncSession, Depends(get_db)]):
     return await role_service.get_all(db)
 
 @router.post(
@@ -25,7 +27,7 @@ async def get_roles(db: AsyncSession = Depends(get_db)):
     status_code=status.HTTP_200_OK,
     dependencies=[Depends(require_permission("role.create"))],
 )
-async def create_role(payload: RoleCreate, db: AsyncSession = Depends(get_db)):
+async def create_role(payload: RoleCreate, db: Annotated[AsyncSession, Depends(get_db)]):
     try:
         return await role_service.create(db, payload)
     except RoleAlreadyError as exc:
@@ -44,10 +46,16 @@ async def create_role(payload: RoleCreate, db: AsyncSession = Depends(get_db)):
 async def update_role(
     role_id: UUID,
     payload: RoleUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     try:
         return await role_service.update(db, payload, role_id)
+
+    except RoleNotFoundError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )
 
     except RoleAlreadyError as exc:
         raise HTTPException(
@@ -64,6 +72,19 @@ async def update_role(
 async def update_status_role(
     role_id: UUID,
     is_active: bool,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    return await role_service.restatus(db, role_id, is_active)
+    try :
+       return await role_service.restatus(db, role_id, is_active)
+
+    except RoleNotFoundError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )
+
+    except RoleProtectedError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )

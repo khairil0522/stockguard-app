@@ -1,17 +1,23 @@
 from uuid import UUID
-from sqlalchemy import select
+
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Inventory, Product
-from app.repositories import product_repository
-from app.schemas.product import ProductCreate, ProductUpdate
-from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError, ProductInactiveError, ProductImageNotFoundError
-from app.errors.inventory import InventoryNotFoundError
-
-from app.services.storage_service import storage_service
 from app.audit.product_audit import ProductAudit
+from app.errors.inventory import InventoryNotFoundError
+from app.errors.product import (
+    DuplicateSKUError,
+    ProductHasStockError,
+    ProductImageNotFoundError,
+    ProductInactiveError,
+    ProductNotFoundError,
+)
+from app.models import Inventory, Product
+from app.repositories.inventory_repository import inventory_repository
+from app.repositories.product_repository import product_repository
+from app.schemas.product import ProductCreate, ProductUpdate
+from app.services.storage_service import storage_service
+
 
 class ProductService:
     async def create(self, db: AsyncSession, payload: ProductCreate, user_id: UUID) -> Product:
@@ -33,39 +39,43 @@ class ProductService:
             )
 
         try:
-            async with db.begin():
-                product = Product(
-                    sku=payload.sku,
-                    name=payload.name,
-                    unit_price=payload.unit_price,
-                    description=payload.description,
-                    is_active=True,
-                )
+            product = Product(
+                sku=payload.sku,
+                name=payload.name,
+                unit_price=payload.unit_price,
+                description=payload.description,
+                is_active=True,
+            )
 
-                db.add(product)
-                await db.flush()
+            db.add(product)
+            await db.flush()
 
-                inventory = Inventory(
-                    product_id=product.id,
-                    on_hand=0,
-                    reserved_qty=0,
-                )
+            inventory = Inventory(
+                product_id=product.id,
+                on_hand=0,
+                reserved_qty=0,
+            )
 
-                db.add(inventory)
-                await db.flush()
+            db.add(inventory)
+            await db.flush()
 
-                product_audit = ProductAudit(db)
+            product_audit = ProductAudit(db)
 
-                await product_audit.create(
-                    user_id=user_id,
-                    product_id=product.id,
-                    sku=product.sku,
-                    name=product.name,
-                )
+            await product_audit.create(
+                user_id=user_id,
+                product_id=product.id,
+                sku=product.sku,
+                name=product.name,
+            )
+
+            await db.commit()
+            await db.refresh(product)
 
             return product
 
         except IntegrityError as exc:
+            await db.rollback()
+
             constraint = getattr(
                 getattr(exc.orig, "diag", None),
                 "constraint_name",
@@ -87,7 +97,7 @@ class ProductService:
 
 
     async def get_detail(self, db: AsyncSession, product_id : UUID):
-        product = product_repository.get_by_id_with_inventory(db, product_id)
+        product = await product_repository.get_by_id_with_inventory(db, product_id)
         if product is None:
             raise ProductNotFoundError()
         
@@ -129,7 +139,7 @@ class ProductService:
 
 
     async def update_status(self, db: AsyncSession, product_id: UUID, is_active: bool, user_id: UUID):
-        product = await product_repository.get_by_id()
+        product = await product_repository.get_by_id(db, product_id)
 
         if product is None:
             product_audit = ProductAudit(db)
@@ -144,7 +154,7 @@ class ProductService:
             
             raise ProductNotFoundError()
 
-        inventory = await inventory_repository.get_by_product_id_for_update()
+        inventory = await inventory_repository.get_by_product_id_for_update(db, product_id)
 
         if not is_active:
             if inventory is None:
@@ -238,7 +248,7 @@ class ProductService:
 
 
     async def delete_image(self, db: AsyncSession, product_id: UUID, user_id: UUID):
-        product = product = await product_repository.get_by_id(db, product_id)
+        product = await product_repository.get_by_id(db, product_id)
 
         if product is None:
             raise ProductNotFoundError()

@@ -2,15 +2,18 @@ from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit.rbac_audit import RBACAudit
 from app.errors.auth import PermissionNotFoundError
-from app.repositories.role_permission_repository import role_permission_repository
-from app.repositories.permission_repository import permission_repository
 from app.models.role_permissions import RolePermission
 from app.models.users import User
-from app.models.permissions import Permission
-from app.schemas.role_permission import RolePermissionAssign, RolePermissionRemove, RolePermissionRead
+from app.repositories.permission_repository import permission_repository
+from app.repositories.role_permission_repository import role_permission_repository
+from app.schemas.role_permission import (
+    RolePermissionAssign,
+    RolePermissionRead,
+    RolePermissionRemove,
+)
 
-from app.audit.rbac_audit import RBACAudit
 
 class RolePermissionService:
     async def get_permissions_by_role(self, db: AsyncSession, role_id: UUID) -> list[RolePermissionRead]:
@@ -53,13 +56,19 @@ class RolePermissionService:
         )
 
         before = {
-            "permission_ids": list(existing_permission_ids),
+            "permission_ids": [
+                str(permission_id)
+                for permission_id in existing_permission_ids
+            ],
         }
 
         after = {
-            "permission_ids": list(
-                existing_permission_ids | permission_ids_to_add
-            ),
+            "permission_ids": [
+                str(permission_id)
+                for permission_id in (
+                    existing_permission_ids | permission_ids_to_add
+                )
+            ],
         }
 
         # 4. Tambahkan association yang baru
@@ -74,7 +83,7 @@ class RolePermissionService:
 
         rbac_audit = RBACAudit(
             db=db,
-            actor_id=current_user.id,
+            actor_id=current_user,
             target_id=role_id,
             target_type="ROLE",
         )
@@ -100,7 +109,10 @@ class RolePermissionService:
         }
 
         before = {
-            "permission_ids": list(existing_permission_ids),
+            "permission_ids": [
+                str(permission_id)
+                for permission_id in existing_permission_ids
+            ],
         }
 
         after = {

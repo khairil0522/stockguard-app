@@ -129,25 +129,20 @@ async def seed_permissions():
             "description": "Mengaktifkan atau menonaktifkan user",
         },
         {
-            "code": "role.read",
-            "name": "Read Role",
-            "description": "Melihat data role",
-        },
-        {
             "code": "role.manage",
             "name": "Manage Role",
             "description": "Mengatur role dan assignment",
-        },
-        {
-            "code": "permission.read",
-            "name": "Read Permission",
-            "description": "Melihat data permission",
         },
         {
             "code": "dashboard.read",
             "name": "Read Dashboard",
             "description": "Melihat dashboard",
         },
+        {
+            "code": "auditlog.read",
+            "name": "Read Auditlog System",
+            "description": "Melihat audit trail activity app",
+        },        
     ]
 
     async with AsyncSessionLocal() as session:

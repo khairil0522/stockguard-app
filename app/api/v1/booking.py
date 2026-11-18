@@ -5,25 +5,25 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.schemas.booking import BookingCreate
-from app.services.booking_service import booking_service
+from app.dependencies.auth import get_current_user, require_permission
+from app.errors.auth import RoleNotFoundError
 from app.errors.booking import (
-    StockNotFoundError,
-    InsufficientQtyError,
     BookingCannotBeCancelledError,
     BookingCannotBeConfirmedError,
-    BookingNotFoundError
+    BookingNotFoundError,
+    InsufficientQtyError,
+    StockNotFoundError,
 )
-from app.errors.product import ProductNotFoundError
 from app.errors.inventory import InventoryNotFoundError
-
-from app.models.users import User
-from app.dependencies.auth import get_current_user, require_permission
-
 from app.errors.product import ProductNotFoundError
+from app.models.users import User
+from app.schemas.booking import BookingCreate
+from app.services.booking_service import booking_service
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
+DEPENDENCY_DB = Depends(get_db)
+CURRENT_USER = Depends(get_current_user)
 
 @router.get(
     "",
@@ -31,11 +31,16 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
     dependencies=[Depends(require_permission("booking.read"))],
 )
 async def get_bookings(
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
+    current_user: User = CURRENT_USER,
+    db: AsyncSession = DEPENDENCY_DB,
 ):
-    return await booking_service.get_all(db, current_user.id)
-
+    try:
+        return await booking_service.get_all(db, current_user.id)
+    except RoleNotFoundError as exc:
+        raise HTTPException(
+            status_code = exc.status_code,
+            detail = exc.detail
+        )
 
 @router.post(
     "",
@@ -44,8 +49,8 @@ async def get_bookings(
 )
 async def create_booking(
     payload: BookingCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: AsyncSession = DEPENDENCY_DB,
+    current_user: User = CURRENT_USER,
 ):
     try:
         return await booking_service.create(db, current_user.id, payload)
@@ -72,8 +77,8 @@ async def create_booking(
 )
 async def confirm_booking(
     booking_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: AsyncSession = DEPENDENCY_DB,
+    current_user: User = CURRENT_USER,
 ):
     try:
         await booking_service.confirmed(db, booking_id, current_user.id)
@@ -96,6 +101,8 @@ async def confirm_booking(
             detail = exc.detail
         )
 
+DEPENDENCY_DB = Depends(get_db)
+CURRENT_USER = Depends(get_current_user)
 
 @router.post(
     "/{booking_id}/cancel",
@@ -103,8 +110,8 @@ async def confirm_booking(
 )
 async def cancel_booking(
     booking_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: AsyncSession = DEPENDENCY_DB,
+    current_user: User = CURRENT_USER,
 ):
     try:
         await booking_service.cancellation(db, booking_id, current_user.id)

@@ -57,6 +57,19 @@ class UserAudit:
             severity="MEDIUM",
         )
 
+    async def unblock(self, actor_id, user_id, username):
+        await AuditLogService.log(
+            self.db,
+            actor_type="USER",
+            user_id=actor_id,
+            event_type="SECURITY",
+            action="UNBLOCK_USER",
+            entity_type="USER",
+            entity_id=user_id,
+            description=f"User {username} was unblocked",
+            severity="MEDIUM",
+        )
+
     async def deactivate(self, actor_id, user_id, username):
         await AuditLogService.log(
             self.db,
@@ -69,4 +82,16 @@ class UserAudit:
             description=f"User {username} was deactivated",
             severity="MEDIUM",
         )
-        
+
+    async def reactivate(self, actor_id, user_id, username):
+        await AuditLogService.log(
+            self.db,
+            actor_type="USER",
+            user_id=actor_id,
+            event_type="SECURITY",
+            action="REACTIVATE_USER",
+            entity_type="USER",
+            entity_id=user_id,
+            description=f"User {username} was reactivated",
+            severity="MEDIUM",
+        )

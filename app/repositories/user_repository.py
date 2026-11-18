@@ -14,9 +14,11 @@ class UserRepository:
     async def get_by_id(self, db: AsyncSession, user_id: UUID) -> User | None:
 
         return await db.scalar(
-            select(User).where(
-                User.id == user_id
+            select(User)
+            .options(
+                selectinload(User.customer_profile)
             )
+            .where(User.id == user_id)
         )
 
     async def get_by_id_for_update(self, db: AsyncSession, user_id: UUID) -> User | None:
@@ -64,16 +66,10 @@ class UserRepository:
         )
 
     async def get_role_names(self, db: AsyncSession, user_id: UUID) -> list[str]:
-
         result = await db.scalars(
             select(Role.name)
-            .join(
-                UserRole,
-                UserRole.role_id == Role.id,
-            )
-            .where(
-                UserRole.user_id == user_id
-            )
+            .join(UserRole, UserRole.role_id == Role.id)
+            .where(UserRole.user_id == user_id)
         )
 
         return result.all()
@@ -92,6 +88,7 @@ class UserRepository:
             select(User)
             .options(
                 selectinload(User.user_roles)
+                .selectinload(UserRole.role)
             )
         )
 

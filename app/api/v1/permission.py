@@ -3,21 +3,22 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.dependencies.auth import require_permission
-from app.errors.auth import PermissionAlreadyError
 from app.db.session import get_db
+from app.dependencies.auth import require_permission
+from app.errors.auth import PermissionAlreadyError, PermissionNotFoundError
 from app.schemas.permission import (
-    PermissionRead,
     PermissionCreate,
+    PermissionRead,
     PermissionUpdate,
 )
 from app.services.permission_service import permission_service
-
 
 router = APIRouter(
     prefix="/permissions",
     tags=["Permissions"],
 )
+
+DEPENDENCY_DB = Depends(get_db)
 
 
 @router.get(
@@ -29,7 +30,7 @@ router = APIRouter(
     ],
 )
 async def get_permissions(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = DEPENDENCY_DB,
 ):
     return await permission_service.get_all(db)
 
@@ -44,11 +45,18 @@ async def get_permissions(
 )
 async def get_permission(
     permission_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = DEPENDENCY_DB,
 ):
-    return await permission_service.get_by_id(
+    try:
+        return await permission_service.get_by_id(
         db,
         permission_id,
+        )
+
+    except PermissionNotFoundError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
     )
 
 
@@ -62,7 +70,7 @@ async def get_permission(
 )
 async def create_permission(
     payload: PermissionCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = DEPENDENCY_DB,
 ):
     try:
         return await permission_service.create(
@@ -88,10 +96,17 @@ async def create_permission(
 async def update_permission(
     permission_id: UUID,
     payload: PermissionUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = DEPENDENCY_DB,
 ):
-    return await permission_service.update(
-        db,
-        permission_id,
-        payload,
-    )
+    try:
+        return await permission_service.update(
+            db,
+            permission_id,
+            payload,
+        )
+
+    except PermissionNotFoundError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )

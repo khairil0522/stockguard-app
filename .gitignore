@@ -1,28 +1,20 @@
+# Python
+__pycache__
+*.pyc
+.pytest_cache
+.venv
 
-# Environment variables
+# Environment
 .env
 .env.*
 !.env.example
 
-# Python virtual environment
-.venv/
-venv/
+# Git
+.git
+.gitignore
 
-# Python cache
-__pycache__/
-*.py[cod]
-.pytest_cache/
+# Documentation
+docs
 
-# Coverage
-.coverage
-htmlcov/
-
-# IDE
-.idea/
-.vscode/
-
-#Testing
-test_async_db.py
-test_model_relationship.py
-app/test_upload.py
-app/test_jwt.py
+# Frontend
+frontend

@@ -1,8 +1,13 @@
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.errors.auth import LogNotFoundError, PermissionDeniedError
 from app.models.audit_logs import AuditLog
+from app.models.users import User
+from app.repositories.user_repository import user_repository
+from app.schemas.audit import AuditLogDetailResponse, AuditLogRead, AuditLogResponse
 
 
 class AuditLogService:
@@ -37,3 +42,43 @@ class AuditLogService:
         await db.flush()
 
         return audit_log
+
+    async def show(db : AsyncSession):
+        result = await db.execute(
+            select(AuditLog)
+        )
+
+        logs = result.scalars().all()
+
+        if not logs:
+            return AuditLogResponse(
+                logs=[],
+                message="No log"
+            )
+
+        return AuditLogResponse(
+            logs=[
+                AuditLogRead.model_validate(log)
+                for log in logs
+            ],
+            message="Log Appeared"
+        )
+
+    async def detail(db: AsyncSession, log_id: UUID, current_user: User):
+        current_roles = set(
+                await user_repository.get_role_names(db, current_user.id)
+        )
+
+        if "SUPERADMIN" not in current_roles:
+            raise PermissionDeniedError()
+
+        result = await db.execute(
+            select(AuditLog).where(AuditLog.id == log_id)
+        )
+
+        log = result.scalar_one_or_none()
+
+        if not log:
+            raise LogNotFoundError()
+
+        return AuditLogDetailResponse.model_validate(log)

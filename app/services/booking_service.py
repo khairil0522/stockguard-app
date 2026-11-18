@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from nanoid import generate
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.audit.booking_audit import BookingAudit
+from app.errors.auth import RoleNotFoundError
 from app.errors.booking import (
     BookingCannotBeCancelledError,
     BookingCannotBeConfirmedError,
@@ -24,7 +25,7 @@ from app.schemas.booking import BookingCreate, BookingItemRead, BookingRead
 
 class BookingService:
     def get_expiry_time(self):
-        waktu_sekarang = datetime.now(datetime.UTC)
+        waktu_sekarang = datetime.now(timezone.utc)  # noqa: UP017
         waktu_kedaluwarsa = waktu_sekarang + timedelta(minutes=15)
         return waktu_kedaluwarsa
 
@@ -80,7 +81,7 @@ class BookingService:
             return booking
 
     async def expired(self, db: AsyncSession, id: UUID):
-        waktu_sekarang = datetime.now(datetime.UTC)
+        waktu_sekarang = datetime.now(timezone.utc)  # noqa: UP017
 
         async with db.begin():
             get_booking = await booking_repository.get_by_id_for_update(db, id)
@@ -152,7 +153,7 @@ class BookingService:
             booking_audit = BookingAudit(db)
 
             await booking_audit.cancel_failed(
-                user_id=user_id,
+                user_id=failed_user_id,
                 booking_id=id,
                 booking_code=failed_booking_code,
             )
@@ -204,7 +205,7 @@ class BookingService:
             booking_audit = BookingAudit(db)
 
             await booking_audit.confirm_failed(
-                user_id=user_id,
+                user_id=failed_user_id,
                 booking_id=id,
                 booking_code=failed_booking_code,
             )
@@ -215,6 +216,8 @@ class BookingService:
 
     async def get_all(self, db: AsyncSession, user_id : UUID):
         role_names = await user_repository.get_role_names(db, user_id)
+        if not role_names:
+            raise RoleNotFoundError()
 
         if "CUSTOMER" in role_names :
             bookings = await booking_repository.get_all_with_items(db, user_id=user_id)

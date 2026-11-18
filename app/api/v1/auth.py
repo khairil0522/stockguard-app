@@ -1,20 +1,36 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.dependencies.auth import get_current_user, get_current_user_roles, get_current_user_permissions
 
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, LoginResponse, UserMeResponse, RegisterResponse, RegisterRequest
+from app.dependencies.auth import (
+    get_current_user,
+    get_current_user_permissions,
+    get_current_user_roles,
+)
+from app.errors.auth import (
+    EmailAlreadyUsedError,
+    InvalidUsernamePasswordError,
+    RoleNotFoundError,
+    UsernameAlreadyUsedError,
+)
 from app.models.users import User
+from app.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    RegisterRequest,
+    RegisterResponse,
+    UserMeResponse,
+)
 from app.services.auth_service import auth_service
-from app.errors.auth import InvalidUsernamePasswordError, UsernameAlreadyUsedError, EmailAlreadyUsedError, RoleNotFoundError
-
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @router.post("/register", response_model=RegisterResponse)
 async def register_user(
     payload: RegisterRequest,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     try:
         return await auth_service.register(db, payload)
@@ -41,7 +57,7 @@ async def register_user(
 @router.post("/login", response_model=LoginResponse)
 async def login_user(
     payload: LoginRequest,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     try:
         access_token = await auth_service.login(
@@ -62,7 +78,7 @@ async def login_user(
 
 @router.get("/me", response_model=UserMeResponse)
 async def get_me(
-    current_user: User = Depends(get_current_user),
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     return {
         "id": str(current_user.id),
@@ -74,7 +90,7 @@ async def get_me(
 
 @router.get("/roles")
 async def get_my_roles(
-    roles = Depends(get_current_user_roles),
+    roles: Annotated[list, Depends(get_current_user_roles)],
 ):
     return [
         {
@@ -86,7 +102,7 @@ async def get_my_roles(
 
 @router.get("/permissions")
 async def get_my_permissions(
-    permissions = Depends(get_current_user_permissions),
+    permissions: Annotated[set, Depends(get_current_user_permissions)],
 ):
     return {
         "permissions": sorted(permissions)

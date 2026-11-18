@@ -1,5 +1,7 @@
 from fastapi import status
+
 from app.errors.base import AppError
+
 
 class UnauthorizedError(AppError):
     status_code = status.HTTP_401_UNAUTHORIZED
@@ -49,10 +51,6 @@ class PermissionAlreadyError(AppError):
     error_code = "PERMISSION_ALREADY_USED"
 
 # Credential RBAC Error
-class ProtectedRoleError(AppError):
-    status_code = status.HTTP_409_CONFLICT
-    detail = "Role is Default System. Cannot be deleted"
-    error_code = "ROLE_CANNOT_DELETE"
 
 class UsernameAlreadyUsedError(AppError):
     status_code = status.HTTP_409_CONFLICT
@@ -78,3 +76,9 @@ class PermissionDeniedError(AppError):
     status_code = status.HTTP_403_FORBIDDEN
     detail = "You do not have permission to perform this action."
     error = "PERMISSION_NOT_ALLOWED"
+
+# Audit
+class LogNotFoundError(AppError):
+    status_code = status.HTTP_404_NOT_FOUND
+    detail = "Log not found"
+    error_code = "LOG_NOT_FOUND"

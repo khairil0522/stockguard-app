@@ -1,14 +1,29 @@
+from typing import Annotated
 from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.schemas.product import ProductCreate, ProductRead, ProductDetailRead, ProductUpdate, ProductStatusUpdate, ProductResponse
-from app.services.product_service import product_service
-from app.errors.product import DuplicateSKUError, ProductNotFoundError, ProductHasStockError, ProductInactiveError
-from app.dependencies.auth import require_permission, get_current_user
-
+from app.dependencies.auth import get_current_user, require_permission
+from app.errors.inventory import InventoryNotFoundError
+from app.errors.product import (
+    DuplicateSKUError,
+    ProductHasStockError,
+    ProductImageNotFoundError,
+    ProductInactiveError,
+    ProductNotFoundError,
+)
 from app.models.users import User
+from app.schemas.product import (
+    ProductCreate,
+    ProductDetailRead,
+    ProductRead,
+    ProductResponse,
+    ProductStatusUpdate,
+    ProductUpdate,
+)
+from app.services.product_service import product_service
 
 router = APIRouter(prefix="/products", tags=["Products"])
 ALLOWED_IMAGE_TYPES = {
@@ -27,8 +42,8 @@ MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5 MB
 )
 async def create_product(
     payload: ProductCreate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
 ):
     try:
         return await product_service.create(db, payload, current_user.id)
@@ -45,7 +60,7 @@ async def create_product(
     dependencies=[Depends(require_permission("product.read"))],
     status_code=status.HTTP_200_OK,
 )
-async def get_products(db: AsyncSession = Depends(get_db)):
+async def get_products(db: Annotated[AsyncSession, Depends(get_db)]):
     return await product_service.get_all(db)
 
 
@@ -57,7 +72,7 @@ async def get_products(db: AsyncSession = Depends(get_db)):
 )
 async def get_product_detail(
     product_id : UUID,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     try:
         return await product_service.get_detail(db, product_id)
@@ -76,8 +91,8 @@ async def get_product_detail(
 async def update_product(
     payload: ProductUpdate,
     product_id : UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user), 
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     try:
         return await product_service.update(db, product_id, payload, current_user.id)
@@ -96,8 +111,8 @@ async def update_product(
 async def update_product_status(
     product_id : UUID,
     payload: ProductStatusUpdate,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)]
 ):
     try:
         return await product_service.update_status(db, product_id, payload.is_active, current_user.id)
@@ -111,10 +126,10 @@ async def update_product_status(
             status_code=exc.status_code,
             detail = exc.detail
         )
-    except ProductInactiveError as exc :
+    except InventoryNotFoundError as exc:
         raise HTTPException(
             status_code=exc.status_code,
-            detail = exc.detail
+            detail=exc.detail,
         )
 
 
@@ -124,8 +139,8 @@ async def update_product_status(
 async def upload_product_image(
     product_id: UUID,
     file: UploadFile,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     if file.content_type not in ALLOWED_IMAGE_TYPES:
         raise HTTPException(
@@ -141,13 +156,20 @@ async def upload_product_image(
             detail="Ukuran file maksimal 5 MB.",
         )
 
-    return await product_service.upload_image(
-        db=db,
-        product_id=product_id,
-        file_content=file_content,
-        content_type=file.content_type,
-        user_id=current_user.id
-    )
+    try:
+        return await product_service.upload_image(
+            db=db,
+            product_id=product_id,
+            file_content=file_content,
+            content_type=file.content_type,
+            user_id=current_user.id,
+        )
+
+    except ProductNotFoundError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail=exc.detail,
+        )
 
 
 @router.get(
@@ -157,7 +179,7 @@ async def upload_product_image(
 )
 async def get_product_image(
     product_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ):
     try:
         image_url = await product_service.get_image_url(
@@ -189,14 +211,14 @@ async def get_product_image(
 )
 async def delete_product_image(
     product_id: UUID,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_user)],
 ):
     try:
         return await product_service.delete_image(
             db=db,
             product_id=product_id,
-            user_id=current_user.id,
+            user_id=current_user.id
         )
 
     except ProductNotFoundError as exc:

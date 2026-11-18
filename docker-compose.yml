@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:18
+    container_name: stockguard-postgres
+
+    environment:
+      POSTGRES_DB: stockguard_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - stockguard_postgres_data:/var/lib/postgresql
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stockguard_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: stockguard-redis
+    ports:
+      - "6379:6379"
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    container_name: stockguard-api
+
+    env_file:
+      - .env
+
+    ports:
+      - "8001:8000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  stockguard_postgres_data:
+      external: true

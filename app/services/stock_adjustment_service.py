@@ -1,16 +1,16 @@
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Inventory, StockMovement, Product
+from app.audit.adjustment_audit import AdjustmentAudit
+from app.errors.product import ProductInactiveError, ProductNotFoundError
+from app.errors.stock import InsufficientStockError, StockNotFoundError
+from app.models import StockMovement
+from app.repositories.inventory_repository import inventory_repository
+from app.repositories.product_repository import product_repository
 from app.repositories.stock_movement_repository import stock_movement_repository
 from app.schemas.stock_movement import StockAdjustmentCreate
 
-from app.errors.stock import InsufficientStockError, StockNotFoundError
-from app.errors.product import ProductNotFoundError, ProductInactiveError
-
-from app.audit.adjustment_audit import AdjustmentAudit
 
 class StockAdjustmentService:
     async def adjust_stock(self, db: AsyncSession, product_id: UUID, payload: StockAdjustmentCreate, user_id: UUID) -> StockMovement:

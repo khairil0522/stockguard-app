@@ -84,47 +84,48 @@ class AuthService:
 
             raise EmailAlreadyUsedError()
 
-        async with db.begin():
-            registers = User(
-                username=payload.username,
-                email=payload.email,
-                full_name=payload.full_name,
-                password_hash=hash_password(payload.password),
-                is_active=True
-            )
+        registers = User(
+            username=payload.username,
+            email=payload.email,
+            full_name=payload.full_name,
+            password_hash=hash_password(payload.password),
+            is_active=True
+        )
 
-            db.add(registers)
-            await db.flush()
+        db.add(registers)
+        await db.flush()
 
-            get_role_id = await db.scalar(
-                select(Role.id).where(Role.name == "CUSTOMER")
-            )
+        get_role_id = await db.scalar(
+            select(Role.id).where(Role.name == "CUSTOMER")
+        )
 
-            if not get_role_id:
-                raise RoleNotFoundError()
+        if not get_role_id:
+            raise RoleNotFoundError()
 
-            user_role = UserRole(
-                user_id=registers.id,
-                role_id=get_role_id
-            )
+        user_role = UserRole(
+            user_id=registers.id,
+            role_id=get_role_id
+        )
 
-            db.add(user_role)
+        db.add(user_role)
 
-            customers = UserCustomer(
-                user_id=registers.id,
-                phone_number=payload.phone_number,
-                address=payload.address,
-                company_name=payload.company_name,
-            )
+        customers = UserCustomer(
+            user_id=registers.id,
+            phone_number=payload.phone_number,
+            address=payload.address,
+            company_name=payload.company_name,
+        )
 
-            db.add(customers)
+        db.add(customers)
 
-            auth_audit = AuthAudit(db)
+        auth_audit = AuthAudit(db)
 
-            await auth_audit.register(
-                user_id=registers.id,
-                username=registers.username,
-            )
+        await auth_audit.register(
+            user_id=registers.id,
+            username=registers.username,
+        )
+
+        await db.commit()
 
         get_access_token = create_access_token(str(registers.id))
 

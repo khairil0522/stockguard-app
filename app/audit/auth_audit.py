@@ -1,3 +1,6 @@
+from app.services.audit_log_service import AuditLogService
+
+
 class AuthAudit:
 
     def __init__(self, db):

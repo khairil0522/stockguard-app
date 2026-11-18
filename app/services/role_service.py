@@ -1,15 +1,12 @@
 from uuid import UUID
 
-from app.repositories.role_repository import role_repository
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.errors.auth import (
-    ProtectedRoleError,
-    RoleAlreadyError,
-    RoleNotFoundError,
-)
+from app.errors.auth import RoleAlreadyError, RoleNotFoundError, RoleProtectedError
 from app.models.roles import Role
+from app.repositories.role_repository import role_repository
 from app.schemas.role import RoleCreate, RoleRead, RoleUpdate
+
 
 class RoleService:
     async def get_all(self, db: AsyncSession) -> list[RoleRead]:
@@ -81,7 +78,7 @@ class RoleService:
             raise RoleNotFoundError()
 
         if role.is_system:
-            raise ProtectedRoleError()
+            raise RoleProtectedError()
 
         role.is_active = is_active
 
