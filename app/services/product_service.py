@@ -108,7 +108,7 @@ class ProductService:
             for product in products
         ]
 
-        await redis_client.set("products:all",json.dumps(products_data))
+        await redis_client.set("products:all",json.dumps(products_data), ex=300)
 
         print(">>> CACHE SET")
 

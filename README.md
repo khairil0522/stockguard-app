@@ -269,17 +269,7 @@ The Repository layer encapsulates database query and data-access operations used
 
 The service layer remains responsible for business rules, transaction boundaries, and audit logging.
 
-```text
-Router
-  ↓
-Service
-  ↓
-Repository
-  ↓
-SQLAlchemy
-  ↓
-PostgreSQL
-```
+![Repository Layer](docs/repository-layer.png)
 
 Repositories are organized by domain rather than using a single generic repository for all entities.
 
