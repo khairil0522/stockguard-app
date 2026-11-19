@@ -188,6 +188,8 @@ StockGuard follows a layered backend architecture with asynchronous database acc
 
 ### Request Data Flow
 
+The following diagram illustrates the end-to-end request and response flow from the React frontend through the FastAPI application layers to PostgreSQL and back to the client.
+
 ![General Request Data Flow](docs/request-data.png)
 
 ### Booking and Inventory Reservation Flow
@@ -202,9 +204,13 @@ StockGuard uses database row-level locking with `SELECT FOR UPDATE` to prevent c
 
 ### Product Image Request Flow
 
+Product images are handled through `ProductService` and delegated to `StorageService` for private storage in AWS S3.
+
 ![Product Image Request](docs/product-image-request.png)
 
 ### Product Image metadata
+
+Product image files are stored in AWS S3, while PostgreSQL stores only the `image_key` used to reference the corresponding object.
 
 ![Product Image Metadata](docs/product-image-metadata.png)
 
@@ -227,7 +233,6 @@ The booking service determines the booking scope based on the authenticated user
 ![Booking Business Logic](docs/booking-business-logic.png)
 
 The router is responsible for request routing and passing the authenticated user's ID to the service. Business rules remain inside the service layer.
-
 
 ### Audit Trail Flow
 
