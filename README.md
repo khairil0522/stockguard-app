@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/stockguard-logo.png" alt="StockGuard" width="80">
+  <img src="docs/stockguard-logo.png" alt="StockGuard" width="10">
   &nbsp;&nbsp;
   <strong>StockGuard</strong>
 </p>
