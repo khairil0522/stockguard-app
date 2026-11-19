@@ -2,6 +2,7 @@
   <img src="docs/stockguard-logo.png" alt="StockGuard" width="50">
   &nbsp;&nbsp;
 </p>
+
 # StockGuard
 
 ### Inventory Management & Stock Reservation API
