@@ -1,8 +1,8 @@
 <p align="center">
   <img src="docs/stockguard-logo.png" alt="StockGuard" width="50">
   &nbsp;&nbsp;
-  <strong>StockGuard</strong>
 </p>
+StockGuard
 
 ### Inventory Management & Stock Reservation API
 
