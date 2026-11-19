@@ -186,6 +186,10 @@ StockGuard follows a layered backend architecture with asynchronous database acc
 
 ![StockGuard Software Architecture](docs/architecture.png)
 
+### Request Data Flow
+
+![General Request Data Flow](docs/request-data.png)
+
 ### Booking and Inventory Reservation Flow
 
 StockGuard uses database row-level locking with `SELECT FOR UPDATE` to prevent concurrent booking requests from reserving the same available inventory.
@@ -198,27 +202,11 @@ StockGuard uses database row-level locking with `SELECT FOR UPDATE` to prevent c
 
 ### Product Image Request Flow
 
-```
-React
-  ↓
-FastAPI Router
-  ↓
-ProductService
-  ↓
-StorageService
-  ↓
-AWS S3
-```
+![Product Image Request](docs/product-image-request.png)
 
 ### Product Image metadata
 
-```
-ProductService
-  ↓
-PostgreSQL
-  ↓
-image_key
-```
+![Product Image Metadata](docs/product-image-metadata.png)
 
 ### Product Caching Flow
 
@@ -236,22 +224,7 @@ Booking access rules are handled in the service layer rather than the router.
 
 The booking service determines the booking scope based on the authenticated user's role:
 
-```text
-Request
-  ↓
-Booking Router
-  ↓
-BookingService
-  ↓
-Check user roles
-  ├── CUSTOMER
-  │     ↓
-  │   Filter by user_id
-  │
-  └── ADMIN / other authorized roles
-        ↓
-      Retrieve all bookings
-```
+![Booking Business Logic](docs/booking-business-logic.png)
 
 The router is responsible for request routing and passing the authenticated user's ID to the service. Business rules remain inside the service layer.
 
@@ -357,7 +330,7 @@ await db.refresh(entity)
 For read-only operations, no explicit transaction management is required.
 
 async with db.begin() should be reserved for operations that require multiple database changes to succeed or fail atomically as a single transaction.
-
+```
 
 
 ---
@@ -758,7 +731,7 @@ StockGuard supports a containerized development environment using Docker Compose
 
 Inside the Docker network, services communicate using their container/service names rather than `localhost`.
 
-![Repository Architecture](docs/docker-env.png)
+![Docker Environment](docs/docker-env.png)
 
 The host machine accesses the API through:
 
@@ -772,11 +745,8 @@ PostgreSQL remains accessible from the host through port 5433, while Redis uses 
 
 ```bash
 docker compose build
-
 docker compose up -d
-
 docker compose ps
-
 docker compose logs -f api
 ```
 
