@@ -1,4 +1,8 @@
-# ![StockGuard Software](docs/stockguard-logo.png) StockGuard
+<p align="center">
+  <img src="docs/stockguard-logo.png" alt="StockGuard" width="80">
+  &nbsp;&nbsp;
+  <strong>StockGuard</strong>
+</p>
 
 ### Inventory Management & Stock Reservation API
 
