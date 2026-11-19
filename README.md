@@ -269,7 +269,7 @@ The Repository layer encapsulates database query and data-access operations used
 
 The service layer remains responsible for business rules, transaction boundaries, and audit logging.
 
-![Repository Layer](docs/repository-layer.png)
+![Repository Layer](docs/repository-flow.png)
 
 Repositories are organized by domain rather than using a single generic repository for all entities.
 
