@@ -1,4 +1,4 @@
-# 🛡️ StockGuard
+# ![StockGuard Software](docs/stockguard-logo.png) StockGuard
 
 ### Inventory Management & Stock Reservation API
 
